@@ -8,7 +8,7 @@ import { HamburgerMenu } from "./design/Header";
 import { useState } from "react";
 import { brainwave } from "../assets";
 
-const Header = ({ onShowAuth }) => {
+const Header = ({ onSignInClick, onSignUpClick }) => {
   const [openNavigation, setOpenNavigation] = useState(false);
 
   const toggleNavigation = () => {
@@ -26,6 +26,28 @@ const Header = ({ onShowAuth }) => {
 
     enablePageScroll();
     setOpenNavigation(false);
+  };
+
+  const handleSignUpClick = () => {
+    if (onSignUpClick) {
+      onSignUpClick();
+    }
+    // Close mobile navigation if open
+    if (openNavigation) {
+      setOpenNavigation(false);
+      enablePageScroll();
+    }
+  };
+
+  const handleSignInClick = () => {
+    if (onSignInClick) {
+      onSignInClick();
+    }
+    // Close mobile navigation if open
+    if (openNavigation) {
+      setOpenNavigation(false);
+      enablePageScroll();
+    }
   };
 
   return (
@@ -62,20 +84,23 @@ const Header = ({ onShowAuth }) => {
           <HamburgerMenu />
         </nav>
 
+        {/* New Account Button */}
         <button
-          onClick={() => onShowAuth && onShowAuth(true)}
+          onClick={handleSignUpClick}
           className="button hidden mr-8 text-n-1/50 transition-colors hover:text-n-1 lg:block"
         >
           New account
         </button>
         
+        {/* Sign In Button */}
         <Button 
           className="hidden lg:flex" 
-          onClick={() => onShowAuth && onShowAuth(true)}
+          onClick={handleSignInClick}
         >
           Sign in
         </Button>
 
+        {/* Mobile Menu Toggle */}
         <Button
           className="ml-auto lg:hidden"
           px="px-3"
