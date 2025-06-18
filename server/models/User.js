@@ -1,7 +1,8 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose')
+const {Schema} = mongoose
 
 const userSchema = new mongoose.Schema({
-    username: {
+    name: {
         type: String,
         required: true,
         unique: true,
@@ -45,8 +46,6 @@ const userSchema = new mongoose.Schema({
     timestamps: true // Adds createdAt and updatedAt automatically
 });
 
-// Index for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ googleId: 1 });
+const UserModel = mongoose.model('User',userSchema)
 
-export default mongoose.model('User', userSchema);
+module.exports = UserModel

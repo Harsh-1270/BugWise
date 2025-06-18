@@ -7,8 +7,10 @@ import MenuSvg from "../assets/svg/MenuSvg";
 import { HamburgerMenu } from "./design/Header";
 import { useState } from "react";
 import { brainwave } from "../assets";
+import { useNavigate } from 'react-router-dom';
 
 const Header = ({ onSignInClick, onSignUpClick }) => {
+  const navigate = useNavigate();
   const [openNavigation, setOpenNavigation] = useState(false);
 
   const toggleNavigation = () => {
@@ -32,6 +34,7 @@ const Header = ({ onSignInClick, onSignUpClick }) => {
     if (onSignUpClick) {
       onSignUpClick();
     }
+
     // Close mobile navigation if open
     if (openNavigation) {
       setOpenNavigation(false);
@@ -40,7 +43,7 @@ const Header = ({ onSignInClick, onSignUpClick }) => {
   };
 
   const handleSignInClick = () => {
-    if (onSignInClick) {
+      if (onSignInClick) {
       onSignInClick();
     }
     // Close mobile navigation if open
