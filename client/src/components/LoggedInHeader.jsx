@@ -4,10 +4,12 @@ import { brainwave } from "../assets";
 import Button from "./Button";
 import MenuSvg from "../assets/svg/MenuSvg";
 import { HamburgerMenu } from "./design/Header";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
+const currentPath = window.location.pathname;
 const LoggedInHeader = ({ onLogout, user }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [openNavigation, setOpenNavigation] = useState(false);
   const [openProfileDropdown, setOpenProfileDropdown] = useState(false);
 
@@ -30,12 +32,12 @@ const LoggedInHeader = ({ onLogout, user }) => {
     }
   };
 
-const handleClick = (url) => {
-  // if (!openNavigation) return;
-  enablePageScroll();
-  setOpenNavigation(false);
-  navigate(url);
-};
+  const handleClick = (url) => {
+    // if (!openNavigation) return;
+    enablePageScroll();
+    setOpenNavigation(false);
+    navigate(url);
+  };
 
   const toggleProfileDropdown = () => {
     setOpenProfileDropdown(!openProfileDropdown);
@@ -55,9 +57,8 @@ const handleClick = (url) => {
 
   return (
     <div
-      className={`fixed top-0 left-0 w-full z-50 border-b border-n-6 lg:bg-n-8/90 lg:backdrop-blur-sm ${
-        openNavigation ? "bg-n-8" : "bg-n-8/90 backdrop-blur-sm"
-      }`}
+      className={`fixed top-0 left-0 w-full z-50 border-b border-n-6 lg:bg-n-8/90 lg:backdrop-blur-sm ${openNavigation ? "bg-n-8" : "bg-n-8/90 backdrop-blur-sm"
+        }`}
     >
       <div className="flex items-center px-5 lg:px-7.5 xl:px-10 max-lg:py-4">
         {/* Logo */}
@@ -67,24 +68,25 @@ const handleClick = (url) => {
 
         {/* Navigation Menu */}
         <nav
-          className={`${
-            openNavigation ? "flex" : "hidden"
-          } fixed top-[5rem] left-0 right-0 bottom-0 bg-n-8 lg:static lg:flex lg:mx-auto lg:bg-transparent`}
+          className={`${openNavigation ? "flex" : "hidden"
+            } fixed top-[5rem] left-0 right-0 bottom-0 bg-n-8 lg:static lg:flex lg:mx-auto lg:bg-transparent`}
         >
           <div className="relative z-2 flex flex-col items-center justify-center m-auto lg:flex-row">
             {loggedInNavigation.map((item) => (
               <button
-  key={item.id}
-  onClick={() => handleClick(item.url)}
-  className={`block relative font-code text-2xl uppercase text-n-1 transition-colors hover:text-color-1 ${
-    item.onlyMobile ? "lg:hidden" : ""
-  } px-6 py-6 md:py-8 lg:-mr-0.25 lg:text-xs lg:font-semibold lg:text-n-1/50 lg:leading-5 lg:hover:text-n-1 xl:px-12`}
->
-  {item.title}
-</button>
+                key={item.id}
+                onClick={() => handleClick(item.url)}
+                className={`block relative font-code text-2xl uppercase transition-colors hover:text-color-1 ${item.onlyMobile ? "lg:hidden" : ""
+                  } px-6 py-6 md:py-8 lg:-mr-0.25 lg:text-xs lg:font-semibold lg:leading-5 lg:hover:text-n-1 xl:px-12 ${location.pathname === item.url
+                    ? "text-color-1 lg:text-color-1"
+                    : "text-n-1 lg:text-n-1/50"
+                  }`}
+              >
+                {item.title}
+              </button>
 
             ))}
-            
+
             {/* Mobile Profile Section */}
             <div className="flex flex-col items-center gap-4 mt-8 lg:hidden">
               <button
@@ -93,8 +95,8 @@ const handleClick = (url) => {
               >
                 Profile Settings
               </button>
-              
-              <Button 
+
+              <Button
                 onClick={handleLogout}
                 className="px-6 py-3 bg-red-600 hover:bg-red-700"
               >
@@ -127,9 +129,8 @@ const handleClick = (url) => {
             </div>
             <span>{user?.name || 'User'}</span>
             <svg
-              className={`w-4 h-4 transition-transform ${
-                openProfileDropdown ? 'rotate-180' : ''
-              }`}
+              className={`w-4 h-4 transition-transform ${openProfileDropdown ? 'rotate-180' : ''
+                }`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
