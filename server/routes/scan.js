@@ -1,239 +1,426 @@
-// routes/scan.js
-const express = require('express');
-const router = express.Router();
-const Scan = require('../models/Scan');
-const { startScan } = require('../services/scanService');
-const auth = require('../middleware/auth');
+  const express = require('express');
+  const router = express.Router();
+  const Scan = require('../models/Scan');
+  const { scanRepository, startScan } = require('../services/aiScanService');
+  const auth = require('../middleware/auth');
+  const rateLimit = require('express-rate-limit');
 
+  // GitHub URL validation pattern
+  const githubRegex = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
 
-// POST /api/scan - Start a new repository scan
-router.post('/', auth, async (req, res) => {
+  // Rate limiting for scan endpoints
+  const scanRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each user to 5 scan requests per windowMs
+    message: 'Too many scan requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // POST /api/scan - Start an AI-powered scan
+ router.post('/', auth, scanRateLimit, async (req, res) => {
   try {
     const { repoUrl } = req.body;
-    const userId = req.user.id; // From your auth middleware
+    const userId = req.user.id;
 
-    // Validate GitHub URL
-    const githubRegex = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
+    // Validate input
+    if (!repoUrl || typeof repoUrl !== 'string') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Repository URL is required' 
+      });
+    }
+
     if (!githubRegex.test(repoUrl)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Please enter a valid GitHub repository URL' 
+        message: 'Invalid GitHub repository URL. Please provide a valid public GitHub repository URL.' 
       });
     }
 
-    // Extract repository name
     const repoName = repoUrl.replace('https://github.com/', '').replace(/\/$/, '');
 
-    // Check if user has a recent scan of the same repo (optional rate limiting)
+    // Enhanced rate limit - 10 minutes per repo per user
     const recentScan = await Scan.findOne({
       userId,
       repoUrl,
-      createdAt: { $gte: new Date(Date.now() - 10 * 60 * 1000) } // 10 minutes
+      createdAt: { $gte: new Date(Date.now() - 10 * 60 * 1000) }
     });
 
     if (recentScan) {
+      const nextScanTime = new Date(recentScan.createdAt.getTime() + 10 * 60 * 1000);
       return res.status(429).json({
         success: false,
-        message: 'Please wait before scanning the same repository again',
-        nextScanAllowed: new Date(recentScan.createdAt.getTime() + 10 * 60 * 1000)
+        message: 'You must wait 10 minutes before scanning this repository again.',
+        nextScanAllowed: nextScanTime,
+        remainingTime: Math.ceil((nextScanTime - new Date()) / 1000 / 60)
       });
     }
 
-    // Create new scan record
-    const scan = new Scan({
+    // Daily limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dailyScans = await Scan.countDocuments({
       userId,
-      repoUrl,
-      repoName,
-      status: 'pending'
+      createdAt: { $gte: today }
+    });
+
+    const DAILY_SCAN_LIMIT = 50;
+    if (dailyScans >= DAILY_SCAN_LIMIT) {
+      return res.status(429).json({
+        success: false,
+        message: `Daily scan limit reached (${DAILY_SCAN_LIMIT} scans per day).`,
+        dailyLimit: DAILY_SCAN_LIMIT,
+        scansUsed: dailyScans
+      });
+    }
+
+    // Save the scan
+    const scan = new Scan({ 
+      userId, 
+      repoUrl, 
+      repoName, 
+      status: 'pending',
+      scanType: 'ai-powered',
+      metadata: {
+        userAgent: req.get('User-Agent'),
+        ipAddress: req.ip
+      }
     });
 
     await scan.save();
 
-    // Start background scanning process
-    startScan(scan._id)
-      .then(() => {
-        console.log(`Scan completed for ${repoUrl}`);
-      })
-      .catch((error) => {
-        console.error(`Scan failed for ${repoUrl}:`, error);
+    // ✅ Added log to trace crash point
+    console.log(`🚀 Scan created for ${repoUrl}, scanId: ${scan._id}`);
+
+    // Start AI scan safely
+    try {
+      await startScan(scan._id);  // now awaited to catch immediate crashes
+//     
+      console.log(`✅ Background scan started for scanId: ${scan._id}`);
+    } catch (scanErr) {
+      console.error(`❌ Background scan crash:`, scanErr);
+      // Update scan status to 'failed'
+      scan.status = 'failed';
+      scan.error = scanErr.message || 'Unknown error in scan service';
+      scan.scannedAt = new Date();
+      await scan.save();
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to start scan due to internal AI error.',
+        error: scan.error
       });
+    }
 
     res.json({
       success: true,
-      message: 'Scan initiated successfully',
+      message: 'AI-powered scan started successfully',
       scanId: scan._id,
-      status: 'pending'
+      status: 'pending',
+      estimatedDuration: '2-5 minutes',
+      scanType: 'ai-powered',
+      dailyScansRemaining: DAILY_SCAN_LIMIT - dailyScans - 1
     });
 
   } catch (error) {
-    console.error('Scan initiation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
+    console.error('🚨 Error initiating AI scan:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error. Please try again later.' 
     });
   }
 });
 
-// GET /api/scan/status/:scanId - Get scan status and results
+
+  // GET /api/scan/history - Enhanced scan history with AI insights
+  router.get('/history', auth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const page = Math.max(1, parseInt(req.query.page)) || 1;
+      const limit = Math.min(50, parseInt(req.query.limit)) || 10;
+      const status = req.query.status; // Filter by status
+      const sortBy = req.query.sortBy || 'createdAt'; // Sort field
+      const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+
+      // Build query
+      const query = { userId };
+      if (status && ['pending', 'scanning', 'completed', 'failed'].includes(status)) {
+        query.status = status;
+      }
+
+      // Build sort object
+      const sort = {};
+      sort[sortBy] = sortOrder;
+
+      const [scans, total, stats] = await Promise.all([
+        Scan.find(query)
+          .select('repoUrl repoName status scanResults.totalBugs scanResults.filesScanned scannedAt createdAt scanType error')
+          .sort(sort)
+          .skip((page - 1) * limit)
+          .limit(limit),
+        Scan.countDocuments(query),
+        // Get user statistics
+        Scan.aggregate([
+          { $match: { userId: userId } },
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 },
+              totalBugs: { $sum: '$scanResults.totalBugs' },
+              totalFiles: { $sum: '$scanResults.filesScanned' }
+            }
+          }
+        ])
+      ]);
+
+      // Process statistics
+      const userStats = {
+        totalScans: 0,
+        completedScans: 0,
+        failedScans: 0,
+        totalBugsFound: 0,
+        totalFilesScanned: 0
+      };
+
+      stats.forEach(stat => {
+        userStats.totalScans += stat.count;
+        if (stat._id === 'completed') {
+          userStats.completedScans = stat.count;
+          userStats.totalBugsFound = stat.totalBugs || 0;
+          userStats.totalFilesScanned = stat.totalFiles || 0;
+        } else if (stat._id === 'failed') {
+          userStats.failedScans = stat.count;
+        }
+      });
+
+      res.json({
+        success: true,
+        data: scans.map(scan => ({
+          scanId: scan._id,
+          repoUrl: scan.repoUrl,
+          repoName: scan.repoName,
+          status: scan.status,
+          scanType: scan.scanType || 'ai-powered',
+          totalBugs: scan.scanResults?.totalBugs || 0,
+          filesScanned: scan.scanResults?.filesScanned || 0,
+          scannedAt: scan.scannedAt,
+          createdAt: scan.createdAt,
+          error: scan.status === 'failed' ? scan.error : undefined
+        })),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalScans: total,
+          hasNextPage: page < Math.ceil(total / limit),
+          hasPrevPage: page > 1
+        },
+        statistics: userStats
+      });
+
+    } catch (error) {
+      console.error('🚨 Error fetching scan history:', error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error. Please try again later.' 
+      });
+    }
+  });
+
+  // Polling route used by frontend to check scan status
 router.get('/status/:scanId', auth, async (req, res) => {
   try {
     const { scanId } = req.params;
     const userId = req.user.id;
 
     const scan = await Scan.findOne({ _id: scanId, userId });
-    
+
     if (!scan) {
       return res.status(404).json({
-        success: false,
-        message: 'Scan not found'
+        status: 'not_found',
+        error: 'Scan not found or unauthorized'
       });
     }
 
-    // Return response based on scan status
-    const response = {
-      success: true,
-      scanId: scan._id,
+    res.json({
       status: scan.status,
-      repoUrl: scan.repoUrl,
-      repoName: scan.repoName,
-      scannedAt: scan.scannedAt
-    };
-
-    // Add scanning progress info
-    if (scan.status === 'scanning') {
-      response.currentScanFile = scan.currentScanFile;
-      response.bugsFoundSoFar = scan.bugsFoundSoFar;
-    }
-
-    // Add results if completed
-    if (scan.status === 'completed' && scan.scanResults) {
-      response.scanResults = scan.scanResults;
-    }
-
-    // Add error if failed
-    if (scan.status === 'failed') {
-      response.error = scan.error;
-    }
-
-    res.json(response);
+      ...(scan.status === 'completed' && { results: scan.scanResults }),
+      ...(scan.status === 'failed' && { error: scan.error })
+    });
 
   } catch (error) {
-    console.error('Get scan status error:', error);
+    console.error('❌ Error checking scan status:', error.message);
     res.status(500).json({
-      success: false,
-      message: 'Internal server error'
+      status: 'error',
+      error: 'Server error while checking scan status'
     });
   }
 });
 
-// GET /api/scan/history - Get user's scan history
-router.get('/history', auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { page = 1, limit = 10 } = req.query;
+  // GET /api/scan/:scanId - Get detailed scan results
+  router.get('/:scanId', auth, async (req, res) => {
+    try {
+      const { scanId } = req.params;
+      const userId = req.user.id;
 
-    const scans = await Scan.find({ userId })
-      .select('repoUrl repoName status scanResults.totalBugs scannedAt createdAt')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      const scan = await Scan.findOne({ _id: scanId, userId });
 
-    const total = await Scan.countDocuments({ userId });
-
-    res.json({
-      success: true,
-      scans: scans.map(scan => ({
-        scanId: scan._id,
-        repoUrl: scan.repoUrl,
-        repoName: scan.repoName,
-        status: scan.status,
-        totalBugs: scan.scanResults?.totalBugs || 0,
-        scannedAt: scan.scannedAt,
-        createdAt: scan.createdAt
-      })),
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalScans: total
+      if (!scan) {
+        return res.status(404).json({
+          success: false,
+          message: 'Scan not found or access denied'
+        });
       }
-    });
 
-  } catch (error) {
-    console.error('Get scan history error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
+      res.json({
+        success: true,
+        data: {
+          scanId: scan._id,
+          repoUrl: scan.repoUrl,
+          repoName: scan.repoName,
+          status: scan.status,
+          scanType: scan.scanType || 'ai-powered',
+          createdAt: scan.createdAt,
+          scannedAt: scan.scannedAt,
+          duration: scan.scannedAt ? 
+            Math.round((scan.scannedAt - scan.createdAt) / 1000) : null,
+          scanResults: scan.scanResults || {},
+          error: scan.status === 'failed' ? scan.error : undefined
+        }
+      });
 
-// GET /api/scan/details/:scanId - Get detailed scan results (for the table)
-router.get('/details/:scanId', auth, async (req, res) => {
-  try {
-    const { scanId } = req.params;
-    const userId = req.user.id;
-
-    const scan = await Scan.findOne({ _id: scanId, userId });
-    
-    if (!scan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Scan not found'
+    } catch (error) {
+      console.error('🚨 Error fetching scan details:', error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error. Please try again later.' 
       });
     }
+  });
 
-    if (scan.status !== 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: 'Scan not completed yet'
+  // DELETE /api/scan/:scanId - Delete a scan
+  router.delete('/:scanId', auth, async (req, res) => {
+    try {
+      const { scanId } = req.params;
+      const userId = req.user.id;
+
+      const scan = await Scan.findOneAndDelete({ _id: scanId, userId });
+
+      if (!scan) {
+        return res.status(404).json({
+          success: false,
+          message: 'Scan not found or access denied'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Scan deleted successfully'
+      });
+
+    } catch (error) {
+      console.error('🚨 Error deleting scan:', error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error. Please try again later.' 
       });
     }
+  });
 
-    res.json({
-      success: true,
-      scanId: scan._id,
-      repoName: scan.repoName,
-      repoUrl: scan.repoUrl,
-      scannedAt: scan.scannedAt,
-      scanResults: scan.scanResults
-    });
+  // GET /api/scan/stats/dashboard - Get dashboard statistics
+  router.get('/stats/dashboard', auth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const timeRange = req.query.timeRange || '7d'; // 7d, 30d, 90d, all
 
-  } catch (error) {
-    console.error('Get scan details error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
+      // Calculate date range
+      let dateFilter = {};
+      if (timeRange !== 'all') {
+        const days = parseInt(timeRange.replace('d', ''));
+        dateFilter = {
+          createdAt: { $gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) }
+        };
+      }
 
-// DELETE /api/scan/:scanId - Delete a scan
-router.delete('/:scanId', auth, async (req, res) => {
-  try {
-    const { scanId } = req.params;
-    const userId = req.user.id;
+      const [overallStats, recentScans, bugTypeStats] = await Promise.all([
+        // Overall statistics
+        Scan.aggregate([
+          { $match: { userId, ...dateFilter } },
+          {
+            $group: {
+              _id: null,
+              totalScans: { $sum: 1 },
+              completedScans: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+              failedScans: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+              totalBugs: { $sum: '$scanResults.totalBugs' },
+              totalFiles: { $sum: '$scanResults.filesScanned' },
+              avgScanTime: { $avg: { 
+                $divide: [{ $subtract: ['$scannedAt', '$createdAt'] }, 1000] 
+              }}
+            }
+          }
+        ]),
+        
+        // Recent scans for activity feed
+        Scan.find({ userId, ...dateFilter })
+          .select('repoName status createdAt scanResults.totalBugs')
+          .sort({ createdAt: -1 })
+          .limit(10),
 
-    const result = await Scan.deleteOne({ _id: scanId, userId });
+        // Bug type distribution
+        Scan.aggregate([
+          { $match: { userId, status: 'completed', ...dateFilter } },
+          { $unwind: '$scanResults.bugs' },
+          {
+            $group: {
+              _id: '$scanResults.bugs.severity',
+              count: { $sum: 1 }
+            }
+          }
+        ])
+      ]);
 
-    if (result.deletedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Scan not found'
+      const stats = overallStats[0] || {
+        totalScans: 0,
+        completedScans: 0,
+        failedScans: 0,
+        totalBugs: 0,
+        totalFiles: 0,
+        avgScanTime: 0
+      };
+
+      res.json({
+        success: true,
+        data: {
+          overview: {
+            totalScans: stats.totalScans,
+            completedScans: stats.completedScans,
+            failedScans: stats.failedScans,
+            successRate: stats.totalScans > 0 ? 
+              Math.round((stats.completedScans / stats.totalScans) * 100) : 0,
+            totalBugsFound: stats.totalBugs || 0,
+            totalFilesScanned: stats.totalFiles || 0,
+            avgScanTime: Math.round(stats.avgScanTime || 0)
+          },
+          recentActivity: recentScans.map(scan => ({
+            repoName: scan.repoName,
+            status: scan.status,
+            createdAt: scan.createdAt,
+            bugsFound: scan.scanResults?.totalBugs || 0
+          })),
+          bugDistribution: bugTypeStats.reduce((acc, item) => {
+            acc[item._id || 'unknown'] = item.count;
+            return acc;
+          }, {})
+        }
+      });
+
+    } catch (error) {
+      console.error('🚨 Error fetching dashboard stats:', error.message);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error. Please try again later.' 
       });
     }
+  });
 
-    res.json({
-      success: true,
-      message: 'Scan deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Delete scan error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
-
-module.exports = router;
+  module.exports = router;

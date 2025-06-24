@@ -4,13 +4,14 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon index.js"
+    "start": "nodemon index.js --ignore temp"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
@@ -22,10 +23,11 @@
     "fs-extra": "^11.3.0",
     "google-auth-library": "^10.1.0",
     "helmet": "^8.1.0",
+    "install": "^0.13.0",
     "joi": "^17.13.3",
     "joi-password-complexity": "^5.2.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.15.1",
+    "mongoose": "^8.16.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",

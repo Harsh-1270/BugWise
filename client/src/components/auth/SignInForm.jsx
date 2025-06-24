@@ -11,45 +11,47 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
     password: '',
   })
 
-  const loginUser = async (e) => {
-    e.preventDefault()
-    const { email, password } = data
-    try {
-      const { data: responseData } = await axios.post('/signinform', {
-        email,
-        password
-      })
+ const loginUser = async (e) => {
+  e.preventDefault();
+  const { email, password } = data;
+  try {
+    const { data: responseData } = await axios.post('/signinform', {
+      email,
+      password,
+    });
 
-      if (responseData.error) {
-        toast.error(responseData.error)
-      } else {
-        // Success - clear form data
-        setData({
-          email: '',
-          password: ''
-        })
-
-        // Prepare user data for the parent component
-        const userData = {
-          name: responseData.name || responseData.user?.name || email.split('@')[0], // Fallback to email username if name not provided
-          email: responseData.email || email,
-          token: responseData.token || 'logged-in',
-          id: responseData.id || responseData.user?.id
-        }
-
-        // Call the success handler passed from App.jsx
-        if (onLoginSuccess) {
-          onLoginSuccess(userData)
-        } else {
-          // Fallback if onLoginSuccess is not provided
-          navigate('/')
-        }
+    if (responseData.error) {
+      toast.error(responseData.error);
+    } else {
+      // Store the token so it can be used in subsequent API calls
+      if (responseData.token) {
+        localStorage.setItem('authToken', responseData.token);
       }
-    } catch (error) {
-      console.error('Login error:', error)
-      toast.error('Login failed. Please try again.')
+
+      // Clear form data
+      setData({
+        email: '',
+        password: ''
+      });
+
+      const userData = {
+        name: responseData.name || responseData.user?.name || email.split('@')[0],
+        email: responseData.email || email,
+        token: responseData.token || 'logged-in',
+        id: responseData.id || responseData.user?.id
+      };
+
+      if (onLoginSuccess) {
+        onLoginSuccess(userData);
+      } else {
+        navigate('/');
+      }
     }
+  } catch (error) {
+    console.error('Login error:', error);
+    toast.error('Login failed. Please try again.');
   }
+};
 
   const handleGoogleSignIn = () => {
     // Add your Google OAuth logic here

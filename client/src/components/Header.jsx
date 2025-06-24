@@ -1,6 +1,6 @@
 import { disablePageScroll, enablePageScroll } from "scroll-lock";
 
-import bugwise from "../assets/bugwise4.png";
+import bugwise from "../assets/bugwise0.png";
 import { navigation } from "../constants";
 import Button from "./Button";
 import MenuSvg from "../assets/svg/MenuSvg";

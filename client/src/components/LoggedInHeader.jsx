@@ -1,10 +1,12 @@
 import { disablePageScroll, enablePageScroll } from "scroll-lock";
 import { useState } from "react";
 import { brainwave } from "../assets";
+import bugwise from "../assets/bugwise0.png";
 import Button from "./Button";
 import MenuSvg from "../assets/svg/MenuSvg";
 import { HamburgerMenu } from "./design/Header";
 import { useNavigate, useLocation } from 'react-router-dom';
+
 
 const currentPath = window.location.pathname;
 const LoggedInHeader = ({ onLogout, user }) => {
@@ -63,7 +65,7 @@ const LoggedInHeader = ({ onLogout, user }) => {
       <div className="flex items-center px-5 lg:px-7.5 xl:px-10 max-lg:py-4">
         {/* Logo */}
         <a className="block w-[12rem] xl:mr-8" href="/dashboard">
-          <img src={brainwave} width={190} height={40} alt="BugWise" />
+          <img src={bugwise} width={180} height={40} alt="BugWise" />
         </a>
 
         {/* Navigation Menu */}

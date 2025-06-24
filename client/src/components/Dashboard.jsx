@@ -1,5 +1,6 @@
 import LoggedInHeader from './LoggedInHeader';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this for navigation
 
 const TypingEffect = ({ text, speed = 100, delay = 0 }) => {
   const [displayText, setDisplayText] = useState('');
@@ -27,14 +28,26 @@ const TypingEffect = ({ text, speed = 100, delay = 0 }) => {
 
   return (
     <span 
-      className="font-bold relative"
+      className="font-bold relative inline-block"
       style={{
-        color: '#8B5CF6',
-        textShadow: '0 0 10px rgba(139, 92, 246, 0.6), 0 0 20px rgba(139, 92, 246, 0.4), 0 0 30px rgba(139, 92, 246, 0.2)'
+        background: 'linear-gradient(45deg, #8B5CF6, #06B6D4, #10B981, #F59E0B, #EF4444)',
+        backgroundSize: '400% 400%',
+        backgroundClip: 'text',
+        WebkitBackgroundClip: 'text',
+        color: 'transparent',
+        animation: 'gradientShift 5s ease-in-out infinite',
+        textShadow: '0 0 30px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.6), 0 0 90px rgba(139, 92, 246, 0.4)'
       }}
     >
       {displayText}
-      <span className="animate-pulse">|</span>
+      <span className="animate-pulse text-white">|</span>
+      <style jsx>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
     </span>
   );
 };
@@ -42,6 +55,7 @@ const TypingEffect = ({ text, speed = 100, delay = 0 }) => {
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate(); // Add navigation hook
 
   // Function to get user data from various sources
   const getUserData = () => {
@@ -127,6 +141,26 @@ const Dashboard = () => {
     window.location.href = '/';
   };
 
+  // Navigation handlers for cards
+  const handleCardClick = (cardType) => {
+    switch(cardType) {
+      case 'detect':
+        navigate('/detect-bugs'); // Adjust path as needed
+        break;
+      case 'history':
+        navigate('/bug-history'); // Adjust path as needed
+        break;
+      case 'insights':
+        navigate('/visual-insights'); // Adjust path as needed
+        break;
+      case 'help':
+        navigate('/help-docs'); // Adjust path as needed
+        break;
+      default:
+        console.log('Unknown card type:', cardType);
+    }
+  };
+
   // Show loading state while fetching user data
   if (loading) {
     return (
@@ -195,9 +229,12 @@ const Dashboard = () => {
 
           {/* Quick Action Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <div className="bg-n-7 border border-n-6 rounded-xl p-6 hover:border-color-1 transition-colors cursor-pointer">
-              <div className="w-12 h-12 bg-color-1 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-n-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6 hover:from-white/10 hover:via-white/15 hover:to-white/10 hover:border-color-1/50 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-2xl hover:shadow-color-1/20"
+              onClick={() => handleCardClick('detect')}
+            >
+              <div className="w-12 h-12 bg-gradient-to-br from-color-1/20 to-color-1/30 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-color-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -205,9 +242,12 @@ const Dashboard = () => {
               <p className="text-n-3 text-sm">Upload your code or connect GitHub</p>
             </div>
 
-            <div className="bg-n-7 border border-n-6 rounded-xl p-6 hover:border-color-1 transition-colors cursor-pointer">
-              <div className="w-12 h-12 bg-color-2 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-n-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6 hover:from-white/10 hover:via-white/15 hover:to-white/10 hover:border-color-2/50 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-2xl hover:shadow-color-2/20"
+              onClick={() => handleCardClick('history')}
+            >
+              <div className="w-12 h-12 bg-gradient-to-br from-color-2/20 to-color-2/30 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-color-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
@@ -215,9 +255,12 @@ const Dashboard = () => {
               <p className="text-n-3 text-sm">View past scans and results</p>
             </div>
 
-            <div className="bg-n-7 border border-n-6 rounded-xl p-6 hover:border-color-1 transition-colors cursor-pointer">
-              <div className="w-12 h-12 bg-color-3 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-n-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6 hover:from-white/10 hover:via-white/15 hover:to-white/10 hover:border-color-3/50 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-2xl hover:shadow-color-3/20"
+              onClick={() => handleCardClick('insights')}
+            >
+              <div className="w-12 h-12 bg-gradient-to-br from-color-3/20 to-color-3/30 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-color-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -225,9 +268,12 @@ const Dashboard = () => {
               <p className="text-n-3 text-sm">Analytics and charts</p>
             </div>
 
-            <div className="bg-n-7 border border-n-6 rounded-xl p-6 hover:border-color-1 transition-colors cursor-pointer">
-              <div className="w-12 h-12 bg-color-4 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-n-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6 hover:from-white/10 hover:via-white/15 hover:to-white/10 hover:border-color-4/50 transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-2xl hover:shadow-color-4/20"
+              onClick={() => handleCardClick('help')}
+            >
+              <div className="w-12 h-12 bg-gradient-to-br from-color-4/20 to-color-4/30 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-color-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -237,10 +283,10 @@ const Dashboard = () => {
           </div>
 
           {/* Recent Activity Section */}
-          <div className="bg-n-7 border border-n-6 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
             <h2 className="text-2xl font-semibold text-n-1 mb-6">Recent Activity</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-n-6 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
                 <div>
                   <p className="text-n-1 font-medium">Code scan completed</p>
                   <p className="text-n-3 text-sm">React Project - 3 bugs found</p>
@@ -248,7 +294,7 @@ const Dashboard = () => {
                 <span className="text-n-3 text-sm">2 hours ago</span>
               </div>
               
-              <div className="flex items-center justify-between p-4 bg-n-6 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
                 <div>
                   <p className="text-n-1 font-medium">GitHub repository connected</p>
                   <p className="text-n-3 text-sm">my-awesome-project</p>
@@ -256,7 +302,7 @@ const Dashboard = () => {
                 <span className="text-n-3 text-sm">1 day ago</span>
               </div>
               
-              <div className="flex items-center justify-between p-4 bg-n-6 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
                 <div>
                   <p className="text-n-1 font-medium">Profile updated</p>
                   <p className="text-n-3 text-sm">Email preferences changed</p>
