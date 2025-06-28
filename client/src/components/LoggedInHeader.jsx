@@ -21,7 +21,7 @@ const LoggedInHeader = ({ onLogout, user }) => {
     { id: "2", title: "Detect Bugs", url: "/detect-bugs" },
     { id: "3", title: "Bug History", url: "/bug-history" },
     { id: "4", title: "Visual Insights", url: "/visual-insights" },
-    { id: "5", title: "Docs/Help", url: "/docs", onlyMobile: true },
+    { id: "5", title: "Docs/Help", url: "/docspage", onlyMobile: true },
   ];
 
   const toggleNavigation = () => {
@@ -65,7 +65,7 @@ const LoggedInHeader = ({ onLogout, user }) => {
       <div className="flex items-center px-5 lg:px-7.5 xl:px-10 max-lg:py-4">
         {/* Logo */}
         <a className="block w-[12rem] xl:mr-8" href="/dashboard">
-          <img src={bugwise} width={180} height={40} alt="BugWise" />
+          <img src={bugwise} width={170} height={30} alt="BugWise" />
         </a>
 
         {/* Navigation Menu */}
@@ -111,12 +111,12 @@ const LoggedInHeader = ({ onLogout, user }) => {
         </nav>
 
         {/* Desktop Docs/Help Link */}
-        <a
-          href="/docs"
+        <button
+          onClick={() => navigate('/docspage')}
           className="hidden lg:block mr-8 text-n-1/50 transition-colors hover:text-n-1 font-code text-xs font-semibold uppercase"
         >
           Docs/Help
-        </a>
+        </button>
 
         {/* Desktop Profile Dropdown */}
         <div className="relative hidden lg:block">

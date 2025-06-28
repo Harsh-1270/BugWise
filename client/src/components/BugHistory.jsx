@@ -1,15 +1,37 @@
-import React, { useState } from 'react';
-import { Search, Github, FileText, Clock, AlertTriangle, AlertCircle, Info, Download, Filter, Eye, RefreshCw, Trash2, Calendar, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Github, FileText, Clock, AlertTriangle, AlertCircle, Info, Download, Filter, Eye, RefreshCw, Trash2, Calendar, ExternalLink, ChevronLeft, ChevronRight, Loader2, X, Check } from 'lucide-react';
 import LoggedInHeader from './LoggedInHeader';
 
 const BugHistoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [severityFilter, setSeverityFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('date');
+  const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [loading, setLoading] = useState(true);
+  const [scansData, setScansData] = useState([]);
+  const [pagination, setPagination] = useState({});
+  const [statistics, setStatistics] = useState({});
+  const [error, setError] = useState(null);
+  const [rescanningIds, setRescanningIds] = useState(new Set());
+  const [toast, setToast] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const itemsPerPage = 10;
+
+  // Footer Component
+const Footer = () => {
+  return (
+    <footer className="relative mt-8">
+      <div className="max-w-7xl mx-auto px-5 lg:px-7.5 xl:px-10 py-12">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <p className="text-n-4 text-sm">© 2025 BugWise. All rights reserved.</p>
+          <p className="text-n-4 text-sm mt-2 md:mt-0">Made with ❤️ for developers</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
 
   const [user, setUser] = useState(() => {
     // Get user data from localStorage or your auth system
@@ -24,97 +46,175 @@ const BugHistoryPage = () => {
     return { name: 'User', email: 'user@example.com' };
   });
 
-  // Mock history data
-  const mockHistoryData = [
-    {
-      id: 1,
-      repoName: 'github.com/user/NoteApp',
-      repoUrl: 'https://github.com/user/NoteApp',
-      dateScanned: '2025-06-15T10:30:00Z',
-      bugsFound: 12,
-      topSeverity: 'Critical',
-      filesScanned: 25,
-      scanDuration: 8.5,
-      status: 'completed'
-    },
-    {
-      id: 2,
-      repoName: 'github.com/user/AuthAPI',
-      repoUrl: 'https://github.com/user/AuthAPI',
-      dateScanned: '2025-06-10T14:20:00Z',
-      bugsFound: 5,
-      topSeverity: 'Major',
-      filesScanned: 18,
-      scanDuration: 6.2,
-      status: 'completed'
-    },
-    {
-      id: 3,
-      repoName: 'github.com/user/TaskManager',
-      repoUrl: 'https://github.com/user/TaskManager',
-      dateScanned: '2025-06-08T09:15:00Z',
-      bugsFound: 8,
-      topSeverity: 'Major',
-      filesScanned: 32,
-      scanDuration: 12.1,
-      status: 'completed'
-    },
-    {
-      id: 4,
-      repoName: 'github.com/user/ShoppingCart',
-      repoUrl: 'https://github.com/user/ShoppingCart',
-      dateScanned: '2025-06-05T16:45:00Z',
-      bugsFound: 3,
-      topSeverity: 'Minor',
-      filesScanned: 14,
-      scanDuration: 4.8,
-      status: 'completed'
-    },
-    {
-      id: 5,
-      repoName: 'github.com/user/WeatherApp',
-      repoUrl: 'https://github.com/user/WeatherApp',
-      dateScanned: '2025-06-02T11:30:00Z',
-      bugsFound: 15,
-      topSeverity: 'Critical',
-      filesScanned: 28,
-      scanDuration: 9.7,
-      status: 'completed'
-    },
-    {
-      id: 6,
-      repoName: 'github.com/user/BlogPlatform',
-      repoUrl: 'https://github.com/user/BlogPlatform',
-      dateScanned: '2025-05-28T13:20:00Z',
-      bugsFound: 7,
-      topSeverity: 'Major',
-      filesScanned: 35,
-      scanDuration: 11.3,
-      status: 'completed'
-    },
-    {
-      id: 7,
-      repoName: 'github.com/user/ChatApp',
-      repoUrl: 'https://github.com/user/ChatApp',
-      dateScanned: '2025-05-25T15:10:00Z',
-      bugsFound: 20,
-      topSeverity: 'Critical',
-      filesScanned: 42,
-      scanDuration: 15.2,
-      status: 'completed'
-    },
-    {
-      id: 8,
-      repoName: 'github.com/user/Dashboard',
-      repoUrl: 'https://github.com/user/Dashboard',
-      dateScanned: '2025-05-20T10:45:00Z',
-      bugsFound: 4,
-      topSeverity: 'Minor',
-      filesScanned: 16,
-      scanDuration: 5.1,
-      status: 'completed'
+  // Get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  };
+
+  // API call to fetch scan history
+  const fetchScanHistory = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortBy: sortBy,
+        sortOrder: sortOrder
+      });
+
+      if (statusFilter !== 'all') {
+        queryParams.append('status', statusFilter);
+      }
+
+      const response = await fetch(`/api/scan/history?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setScansData(data.data || []);
+        setPagination(data.pagination || {});
+        setStatistics(data.statistics || {});
+      } else {
+        throw new Error(data.message || 'Failed to fetch scan history');
+      }
+    } catch (err) {
+      console.error('Error fetching scan history:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // API call to delete a scan
+  const deleteScan = async (scanId) => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`/api/scan/${scanId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the data after successful deletion
+        fetchScanHistory();
+        return true;
+      } else {
+        throw new Error(data.message || 'Failed to delete scan');
+      }
+    } catch (err) {
+      console.error('Error deleting scan:', err);
+      alert(`Error deleting scan: ${err.message}`);
+      return false;
+    }
+  };
+
+  // API call to start a new scan (rescan)
+  const startRescan = async (repoUrl, scanId) => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Add to rescanning set
+      setRescanningIds(prev => new Set([...prev, scanId]));
+
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ repoUrl })
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Show success message and refresh data
+        setTimeout(() => {
+          setToast({
+            type: 'success',
+            message: 'Rescan started successfully!',
+            description: `Repository "${repoUrl.split('/').pop()}" is being rescanned.`
+          });
+          fetchScanHistory();
+        }, 2000); // Keep animation for 2 seconds
+        return true;
+      } else {
+        throw new Error(data.message || 'Failed to start scan');
+      }
+    } catch (err) {
+      console.error('Error starting rescan:', err);
+      setRescanningIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(scanId);
+        return newSet;
+      });
+      alert(`Error starting rescan: ${err.message}`);
+      return false;
+    }
+  };
+
+  setTimeout(() => setToast(null), 5000);
+  // Effect to fetch data when component mounts or filters change
+  useEffect(() => {
+    fetchScanHistory();
+  }, [currentPage, sortBy, sortOrder, statusFilter]);
+
+  // Client-side filtering for search (removed severity filter)
+  const filteredData = scansData.filter(item => {
+    const matchesSearch = item.repoName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.repoUrl.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -126,90 +226,25 @@ const BugHistoryPage = () => {
     });
   };
 
-  const getSeverityColor = (severity) => {
-    switch (severity.toLowerCase()) {
-      case 'critical': return 'text-red-400 bg-red-500/20 border-red-500/30';
-      case 'major': return 'text-orange-400 bg-orange-500/20 border-orange-500/30';
-      case 'minor': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return 'text-green-400 bg-green-500/20 border-green-500/30';
+      case 'failed': return 'text-red-400 bg-red-500/20 border-red-500/30';
+      case 'scanning': return 'text-blue-400 bg-blue-500/20 border-blue-500/30';
+      case 'pending': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
       default: return 'text-n-3 bg-n-6 border-n-5';
     }
   };
 
-  const getSeverityIcon = (severity) => {
-    switch (severity.toLowerCase()) {
-      case 'critical': return '🔴';
-      case 'major': return '🟠';
-      case 'minor': return '🟡';
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed': return '✅';
+      case 'failed': return '❌';
+      case 'scanning': return '🔄';
+      case 'pending': return '⏳';
       default: return '⚪';
     }
   };
-
-  // Filter and sort data
-  const filteredData = mockHistoryData.filter(item => {
-    const matchesSearch = item.repoName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSeverity = severityFilter === 'all' || item.topSeverity.toLowerCase() === severityFilter;
-
-    let matchesDate = true;
-    if (dateRange !== 'all') {
-      const itemDate = new Date(item.dateScanned);
-      const now = new Date();
-      const daysDiff = Math.floor((now - itemDate) / (1000 * 60 * 60 * 24));
-
-      switch (dateRange) {
-        case 'week':
-          matchesDate = daysDiff <= 7;
-          break;
-        case 'month':
-          matchesDate = daysDiff <= 30;
-          break;
-        case 'quarter':
-          matchesDate = daysDiff <= 90;
-          break;
-      }
-    }
-
-    return matchesSearch && matchesSeverity && matchesDate;
-  });
-
-  // Sort data
-  const sortedData = [...filteredData].sort((a, b) => {
-    let aVal, bVal;
-
-    switch (sortBy) {
-      case 'date':
-        aVal = new Date(a.dateScanned);
-        bVal = new Date(b.dateScanned);
-        break;
-      case 'bugs':
-        aVal = a.bugsFound;
-        bVal = b.bugsFound;
-        break;
-      case 'name':
-        aVal = a.repoName.toLowerCase();
-        bVal = b.repoName.toLowerCase();
-        break;
-      case 'severity':
-        const severityOrder = { 'critical': 3, 'major': 2, 'minor': 1 };
-        aVal = severityOrder[a.topSeverity.toLowerCase()] || 0;
-        bVal = severityOrder[b.topSeverity.toLowerCase()] || 0;
-        break;
-      default:
-        return 0;
-    }
-
-    if (sortOrder === 'asc') {
-      return aVal > bVal ? 1 : -1;
-    } else {
-      return aVal < bVal ? 1 : -1;
-    }
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  const paginatedData = sortedData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
   const handleLogout = () => {
     // Clear all user-related data
@@ -222,27 +257,214 @@ const BugHistoryPage = () => {
     window.location.href = '/';
   };
 
-  const handleView = (repo) => {
-    // Navigate to detailed view - you can implement this based on your routing
-    console.log('View details for:', repo);
+  const handleView = (scan) => {
+    // Navigate to detect-bugs page with scan data
+    const scanData = encodeURIComponent(JSON.stringify(scan));
+    window.location.href = `/detect-bugs?scanData=${scanData}`;
   };
 
-  const handleRescan = (repo) => {
-    // Trigger rescan - you can implement this based on your scan logic
-    console.log('Rescan:', repo);
+  const showConfirmDialog = (action, item) => {
+    setConfirmAction({ action, item });
+    setShowConfirmModal(true);
   };
 
-  const handleDelete = (repo) => {
-    // Delete history entry - you can implement this based on your data management
-    if (window.confirm(`Are you sure you want to delete the scan history for ${repo.repoName}?`)) {
-      console.log('Delete:', repo);
+  const handleConfirm = async () => {
+    if (!confirmAction) return;
+
+    const { action, item } = confirmAction;
+
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+
+    if (action === 'rescan') {
+      await startRescan(item.repoUrl, item.scanId);
+    } else if (action === 'delete') {
+      await deleteScan(item.scanId);
     }
+
+  };
+
+  const handleCancel = () => {
+    setShowConfirmModal(false);
+    setConfirmAction(null);
   };
 
   const handleExport = () => {
     // Export functionality - you can implement CSV/PDF export
-    console.log('Export history');
+    const csvContent = [
+      ['Repository', 'Status', 'Bugs Found', 'Files Scanned', 'Scan Date', 'Scan Type'].join(','),
+      ...filteredData.map(scan => [
+        scan.repoName,
+        scan.status,
+        scan.totalBugs || 0,
+        scan.filesScanned || 0,
+        new Date(scan.createdAt).toISOString(),
+        scan.scanType || 'ai-powered'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scan-history-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleSortChange = (newSortValue) => {
+    const [field, order] = newSortValue.split('-');
+    setSortBy(field);
+    setSortOrder(order);
+    setCurrentPage(1); // Reset to first page when sorting changes
+  };
+
+  // Generate page numbers for pagination
+  const generatePageNumbers = () => {
+    const totalPages = pagination.totalPages || 1;
+    const currentPage = pagination.currentPage || 1;
+    const pages = [];
+
+    // Always show first page
+    pages.push(1);
+
+    if (totalPages <= 5) {
+      // If total pages is 5 or less, show all pages
+      for (let i = 2; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Complex pagination logic
+      if (currentPage <= 3) {
+        // Show first 4 pages + last page
+        for (let i = 2; i <= 4; i++) {
+          pages.push(i);
+        }
+        if (totalPages > 5) pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        // Show first page + last 4 pages
+        if (totalPages > 5) pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          if (i > 1) pages.push(i);
+        }
+      } else {
+        // Show first + current-1, current, current+1 + last
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+
+    return [...new Set(pages)]; // Remove duplicates
+  };
+
+  // Confirmation Modal Component
+  const ConfirmModal = () => {
+    if (!showConfirmModal || !confirmAction) return null;
+
+    const { action, item } = confirmAction;
+    const isRescan = action === 'rescan';
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gradient-to-br from-white/10 via-white/20 to-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <div className="text-center">
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${isRescan ? 'bg-green-500/20' : 'bg-red-500/20'
+              }`}>
+              {isRescan ? (
+                <RefreshCw className="w-8 h-8 text-green-400" />
+              ) : (
+                <Trash2 className="w-8 h-8 text-red-400" />
+              )}
+            </div>
+
+            <h3 className="text-xl font-bold text-white mb-2">
+              {isRescan ? 'Confirm Rescan' : 'Confirm Delete'}
+            </h3>
+
+            <p className="text-n-3 mb-6 leading-relaxed">
+              {isRescan
+                ? `Are you sure you want to rescan "${item.repoName}"? This will start a new scan in the background.`
+                : `Are you sure you want to delete the scan history for "${item.repoName}"? This action cannot be undone.`
+              }
+            </p>
+
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleCancel}
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl transition-all duration-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                className={`px-6 py-3 font-semibold rounded-xl transition-all duration-300 ${isRescan
+                  ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-500/90 hover:to-green-600/90 text-white'
+                  : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-500/90 hover:to-red-600/90 text-white'
+                  }`}
+              >
+                {isRescan ? 'Start Rescan' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && scansData.length === 0) {
+    return (
+      <div className="min-h-screen bg-n-8 relative overflow-hidden">
+        <LoggedInHeader onLogout={handleLogout} user={user} />
+        <div className="pt-32 px-5 lg:px-7.5 xl:px-10 relative z-10">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 text-color-1 animate-spin mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-n-2 mb-2">Loading Scan History</h3>
+                <p className="text-n-4">Please wait while we fetch your scan data...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-n-8 relative overflow-hidden">
+        <LoggedInHeader onLogout={handleLogout} user={user} />
+        <div className="pt-32 px-5 lg:px-7.5 xl:px-10 relative z-10">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-n-2 mb-2">Error Loading Data</h3>
+                <p className="text-n-4 mb-4">{error}</p>
+                <button
+                  onClick={() => fetchScanHistory()}
+                  className="px-6 py-3 bg-gradient-to-r from-color-1 to-purple-600 text-white font-semibold rounded-xl hover:from-color-1/90 hover:to-purple-600/90 transition-all duration-300"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-n-8 relative overflow-hidden">
@@ -298,7 +520,7 @@ const BugHistoryPage = () => {
                   <p className="text-n-3">Find specific repositories and scans</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   {/* Search */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-n-4 w-4 h-4" />
@@ -311,64 +533,46 @@ const BugHistoryPage = () => {
                     />
                   </div>
 
-                  {/* Date Range */}
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-n-4 w-4 h-4" />
-                    <select
-                      value={dateRange}
-                      onChange={(e) => setDateRange(e.target.value)}
-                      className="w-full pl-10 pr-8 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-color-1 focus:border-transparent appearance-none text-white [&>option]:bg-gray-800 [&>option]:text-white"
-                      style={{ colorScheme: 'dark' }}
-                    >
-                      <option value="all" className="bg-gray-800 text-white">All Time</option>
-                      <option value="week" className="bg-gray-800 text-white">Last Week</option>
-                      <option value="month" className="bg-gray-800 text-white">Last Month</option>
-                      <option value="quarter" className="bg-gray-800 text-white">Last 3 Months</option>
-                    </select>
-                  </div>
-
-                  {/* Severity Filter */}
+                  {/* Status Filter */}
                   <div className="relative">
                     <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-n-4 w-4 h-4" />
                     <select
-                      value={severityFilter}
-                      onChange={(e) => setSeverityFilter(e.target.value)}
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className="w-full pl-10 pr-8 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-color-1 focus:border-transparent appearance-none text-white [&>option]:bg-gray-800 [&>option]:text-white"
-                      style={{colorScheme: 'dark'}}
+                      style={{ colorScheme: 'dark' }}
                     >
-                      <option value="all">All Severities</option>
-                      <option value="critical">🔴 Critical</option>
-                      <option value="major">🟠 Major</option>
-                      <option value="minor">🟡 Minor</option>
+                      <option value="all" className="bg-gray-800 text-white">All Status</option>
+                      <option value="pending" className="bg-gray-800 text-white">⏳ Pending</option>
+                      <option value="scanning" className="bg-gray-800 text-white">🔄 Scanning</option>
+                      <option value="completed" className="bg-gray-800 text-white">✅ Completed</option>
+                      <option value="failed" className="bg-gray-800 text-white">❌ Failed</option>
                     </select>
                   </div>
 
                   {/* Sort By */}
                   <div className="relative">
-                    <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-n-4 w-4 h-4" />
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-n-4 w-4 h-4" />
                     <select
                       value={`${sortBy}-${sortOrder}`}
-                      onChange={(e) => {
-                        const [field, order] = e.target.value.split('-');
-                        setSortBy(field);
-                        setSortOrder(order);
-                      }}
+                      onChange={(e) => handleSortChange(e.target.value)}
                       className="w-full pl-10 pr-8 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-color-1 focus:border-transparent appearance-none text-white [&>option]:bg-gray-800 [&>option]:text-white"
                     >
-                      <option value="date-desc">Newest First</option>
-                      <option value="date-asc">Oldest First</option>
-                      <option value="bugs-desc">Most Bugs</option>
-                      <option value="bugs-asc">Least Bugs</option>
-                      <option value="name-asc">Name A-Z</option>
-                      <option value="name-desc">Name Z-A</option>
-                      <option value="severity-desc">Severity High-Low</option>
+                      <option value="createdAt-desc">Newest First</option>
+                      <option value="createdAt-asc">Oldest First</option>
+                      <option value="repoName-asc">Name A-Z</option>
+                      <option value="repoName-desc">Name Z-A</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <div className="text-n-3">
-                    Showing {paginatedData.length} of {filteredData.length} results
+                    Showing {filteredData.length} of {pagination.totalScans || 0} results
+                    {loading && <Loader2 className="inline w-4 h-4 ml-2 animate-spin" />}
                   </div>
 
                   <button
@@ -392,18 +596,18 @@ const BugHistoryPage = () => {
                     <th className="text-left py-4 px-6 font-semibold text-n-1">#</th>
                     <th className="text-left py-4 px-6 font-semibold text-n-1">Repo Name</th>
                     <th className="text-left py-4 px-6 font-semibold text-n-1">Date Scanned</th>
+                    <th className="text-left py-4 px-6 font-semibold text-n-1">Status</th>
                     <th className="text-left py-4 px-6 font-semibold text-n-1">Bugs Found</th>
-                    <th className="text-left py-4 px-6 font-semibold text-n-1">Top Severity</th>
                     <th className="text-left py-4 px-6 font-semibold text-n-1">Files</th>
-                    <th className="text-left py-4 px-6 font-semibold text-n-1">Duration</th>
+                    <th className="text-left py-4 px-6 font-semibold text-n-1">Type</th>
                     <th className="text-left py-4 px-6 font-semibold text-n-1">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedData.map((item, index) => (
-                    <tr key={item.id} className="border-b border-n-6 hover:bg-n-6/30 transition-colors">
+                  {filteredData.map((item, index) => (
+                    <tr key={item.scanId} className="border-b border-n-6 hover:bg-n-6/30 transition-colors">
                       <td className="py-4 px-6 text-n-3 font-mono">
-                        {(currentPage - 1) * itemsPerPage + index + 1}
+                        {(pagination.currentPage - 1) * itemsPerPage + index + 1}
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
@@ -424,27 +628,27 @@ const BugHistoryPage = () => {
                         </div>
                       </td>
                       <td className="py-4 px-6 text-n-2 font-mono text-sm">
-                        {formatDate(item.dateScanned)}
+                        {formatDate(item.createdAt)}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(item.status)}`}>
+                          <span>{getStatusIcon(item.status)}</span>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </span>
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
                             <AlertTriangle className="w-4 h-4 text-red-400" />
                           </div>
-                          <span className="font-bold text-n-1">{item.bugsFound}</span>
+                          <span className="font-bold text-n-1">{item.totalBugs || 0}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getSeverityColor(item.topSeverity)}`}>
-                          <span>{getSeverityIcon(item.topSeverity)}</span>
-                          {item.topSeverity}
-                        </span>
-                      </td>
                       <td className="py-4 px-6 text-n-2 font-mono">
-                        {item.filesScanned}
+                        {item.filesScanned || 0}
                       </td>
-                      <td className="py-4 px-6 text-n-2 font-mono">
-                        {item.scanDuration}s
+                      <td className="py-4 px-6 text-n-2 font-mono text-sm">
+                        {item.scanType || 'ai-powered'}
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2">
@@ -456,14 +660,18 @@ const BugHistoryPage = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleRescan(item)}
-                            className="p-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors"
+                            onClick={() => showConfirmDialog('rescan', item)}
+                            className="p-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors relative"
                             title="Re-scan"
+                            disabled={rescanningIds.has(item.scanId)}
                           >
-                            <RefreshCw className="w-4 h-4" />
+                            <RefreshCw className={`w-4 h-4 ${rescanningIds.has(item.scanId) ? 'animate-spin' : ''}`} />
+                            {rescanningIds.has(item.scanId) && (
+                              <div className="absolute inset-0 bg-green-500/10 rounded-lg animate-pulse"></div>
+                            )}
                           </button>
                           <button
-                            onClick={() => handleDelete(item)}
+                            onClick={() => showConfirmDialog('delete', item)}
                             className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
                             title="Delete"
                           >
@@ -475,66 +683,144 @@ const BugHistoryPage = () => {
                   ))}
                 </tbody>
               </table>
-
-              {paginatedData.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-n-6 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-n-4" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-n-2 mb-2">No Results Found</h3>
-                  <p className="text-n-4">Try adjusting your search criteria or filters</p>
-                </div>
-              )}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="bg-n-6 px-6 py-4 flex items-center justify-between border-t border-n-5">
-                <div className="text-n-3 text-sm">
-                  Page {currentPage} of {totalPages}
-                </div>
-
-                <div className="flex items-center gap-2">
+            {/* Empty State */}
+            {filteredData.length === 0 && !loading && (
+              <div className="text-center py-20">
+                <FileText className="w-16 h-16 text-n-4 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-n-2 mb-2">No Scans Found</h3>
+                <p className="text-n-4 mb-6">
+                  {searchTerm || statusFilter !== 'all'
+                    ? 'No scans match your current filters. Try adjusting your search criteria.'
+                    : 'You haven\'t performed any scans yet. Start by scanning your first repository!'
+                  }
+                </p>
+                {searchTerm && (
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="p-2 bg-n-7 hover:bg-n-5 text-n-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setStatusFilter('all');
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-color-1 to-purple-600 text-white font-semibold rounded-xl hover:from-color-1/90 hover:to-purple-600/90 transition-all duration-300"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    Clear Filters
                   </button>
-
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-2 rounded-lg transition-colors ${currentPage === pageNum
-                            ? 'bg-color-1 text-white'
-                            : 'bg-n-7 hover:bg-n-5 text-n-2'
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-2 bg-n-7 hover:bg-n-5 text-n-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+                )}
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="mt-8 flex justify-center">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-3 bg-n-6 hover:bg-n-5 disabled:opacity-50 disabled:cursor-not-allowed text-n-2 rounded-xl transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {generatePageNumbers().map((page, index) => (
+                  <button
+                    key={index}
+                    onClick={() => typeof page === 'number' && handlePageChange(page)}
+                    disabled={page === '...' || page === currentPage}
+                    className={`px-4 py-3 rounded-xl transition-colors font-medium ${page === currentPage
+                      ? 'bg-gradient-to-r from-color-1 to-purple-600 text-white'
+                      : page === '...'
+                        ? 'text-n-4 cursor-default'
+                        : 'bg-n-6 hover:bg-n-5 text-n-2'
+                      }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => handlePageChange(Math.min(pagination.totalPages, currentPage + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                  className="p-3 bg-n-6 hover:bg-n-5 disabled:opacity-50 disabled:cursor-not-allowed text-n-2 rounded-xl transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className={`bg-gradient-to-br backdrop-blur-xl border rounded-2xl p-4 shadow-2xl transform transition-all duration-500 min-w-80 ${toast.type === 'success'
+              ? 'from-green-500/20 via-green-400/10 to-green-500/20 border-green-500/30'
+              : 'from-red-500/20 via-red-400/10 to-red-500/20 border-red-500/30'
+            }`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-500/20' : 'bg-red-500/20'
+                }`}>
+                {toast.type === 'success' ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <X className="w-4 h-4 text-red-400" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h4 className="text-white font-semibold text-sm">{toast.message}</h4>
+                {toast.description && (
+                  <p className="text-n-3 text-xs mt-1">{toast.description}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setToast(null)}
+                className="text-n-4 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Confirmation Modal */}
+      <ConfirmModal />
+      {/* Quick Actions Footer */}
+      <div className="mt-12 mb-8 mr-15 ml-15">
+        <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-n-1 mb-1">Need Help?</h3>
+              <p className="text-n-4 text-sm">
+                Check our documentation or contact support for assistance
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.open('/docs', '_blank')}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl transition-all duration-300"
+              >
+                <FileText className="w-4 h-4" />
+                Documentation
+              </button>
+              <button
+                onClick={() => window.location.href = '/detect-bugs'}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-color-1 to-purple-600 text-white font-semibold rounded-xl hover:from-color-1/90 hover:to-purple-600/90 transition-all duration-300"
+              >
+                <Github className="w-4 h-4" />
+                New Scan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <Footer />
     </div>
   );
 };
+
+
 
 export default BugHistoryPage;

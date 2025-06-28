@@ -67,7 +67,7 @@ const BUG_PATTERNS = {
       /\w+\.\w+\s*(?!\s*!=\s*null)/gi,
       /\[\w+\]\s*(?!\s*!=\s*null)/gi
     ],
-    severity: 'Minor',
+    severity: 'Major',
     category: 'Runtime Error'
   },
   'hardcoded-secrets': {

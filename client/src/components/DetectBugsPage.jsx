@@ -13,6 +13,20 @@ const DetectBugsPage = () => {
   const [severityFilter, setSeverityFilter] = useState('all');
   const [error, setError] = useState('');
 
+  // Footer Component
+const Footer = () => {
+  return (
+    <footer className="relative mt-4">
+      <div className="max-w-7xl mx-auto px-5 lg:px-7.5 xl:px-10 py-12">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <p className="text-n-4 text-sm">© 2025 BugWise. All rights reserved.</p>
+          <p className="text-n-4 text-sm mt-2 md:mt-0">Made with ❤️ for developers</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 useEffect(() => {
   const storedResults = sessionStorage.getItem('scanResults');
   const storedRepoUrl = sessionStorage.getItem('repoUrl');
@@ -104,7 +118,7 @@ useEffect(() => {
     return {
       totalBugs: bugs.length,
       filesScanned: backendResults.filesScanned || 0,
-      scanDuration: backendResults.scanDuration || 0,
+      scanDuration: backendResults.duration || 0,
       detailedBugs,
       bugsByFile: bugsByFileArray,
       bugsBySeverity: bugsBySeverityArray
@@ -655,6 +669,7 @@ useEffect(() => {
           )}
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

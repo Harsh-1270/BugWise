@@ -91,7 +91,8 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path='/bug-history' element={<BugHistory user={user}/>}/>
           <Route path='/visual-insights' element={<VisualInsights user={user}/>}/>
-          <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="/docspage" element={<Navigate to="/docspage" /> }/>
+          <Route path="*" element={<Navigate to="/dashboard" />}/>
         </Routes>
       </>
     );

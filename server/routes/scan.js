@@ -4,6 +4,7 @@
   const { scanRepository, startScan } = require('../services/aiScanService');
   const auth = require('../middleware/auth');
   const rateLimit = require('express-rate-limit');
+  const mongoose = require('mongoose');
 
   // GitHub URL validation pattern
   const githubRegex = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
@@ -423,4 +424,376 @@ router.get('/status/:scanId', auth, async (req, res) => {
     }
   });
 
-  module.exports = router;
+// 🆕 NEW API: GET /api/scan/:scanId/bugs - Get detailed bugs for a specific scan
+
+router.get('/:scanId/bugs', auth, async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    const userId = req.user.id;
+
+    // Validate scanId parameter
+    if (!scanId || scanId === 'undefined' || scanId === 'null') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid scan ID provided'
+      });
+    }
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(scanId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid scan ID format'
+      });
+    }
+
+    // Verify scan ownership
+    const scan = await Scan.findOne({ 
+      _id: new mongoose.Types.ObjectId(scanId), 
+      userId 
+    });
+
+    if (!scan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Scan not found or access denied'
+      });
+    }
+
+    if (scan.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Scan is not completed yet'
+      });
+    }
+
+    // Extract bugs from scan results
+    const bugs = scan.scanResults?.bugs || [];
+
+    // Transform bugs to include additional metadata
+    const transformedBugs = bugs.map(bug => ({
+      id: bug.id || `bug_${Math.random().toString(36).substr(2, 9)}`,
+      file: bug.file || bug.filePath,
+      filePath: bug.filePath || bug.file,
+      line: bug.line || bug.lineNumber,
+      column: bug.column,
+      severity: bug.severity || 'info',
+      type: bug.type || bug.category,
+      message: bug.message || bug.description,
+      rule: bug.rule || bug.ruleId,
+      category: bug.category || bug.type,
+      description: bug.description || bug.message,
+      suggestion: bug.suggestion || bug.fix,
+      codeSnippet: bug.codeSnippet || bug.code,
+      createdAt: scan.scannedAt,
+      scanId: scan._id,
+      repoName: scan.repoName
+    }));
+
+    res.json({
+      success: true,
+      data: transformedBugs,
+      totalBugs: transformedBugs.length,
+      scanInfo: {
+        scanId: scan._id,
+        repoName: scan.repoName,
+        scannedAt: scan.scannedAt,
+        totalFiles: scan.scanResults?.filesScanned || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('🚨 Error fetching scan bugs:', error.message);
+    
+    // Handle specific MongoDB errors
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid scan ID format'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.'
+    });
+  }
+});
+// 🆕 NEW API: GET /api/scan/analytics/overview - Get analytics overview for visual insights
+router.get('/analytics/overview', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { dateRange = '30', repository, severity, language } = req.query;
+
+    // Calculate date filter
+    const days = parseInt(dateRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Build base query
+    const baseQuery = {
+      userId,
+      status: 'completed',
+      scannedAt: { $gte: startDate }
+    };
+
+    // Add repository filter if specified
+    if (repository && repository !== 'all') {
+      baseQuery.repoName = repository;
+    }
+
+    // Get all matching scans
+    const scans = await Scan.find(baseQuery)
+      .select('repoName scanResults scannedAt createdAt')
+      .sort({ scannedAt: -1 });
+
+    // Extract all bugs with filters
+    let allBugs = [];
+    scans.forEach(scan => {
+      const bugs = scan.scanResults?.bugs || [];
+      const transformedBugs = bugs.map(bug => ({
+        ...bug,
+        scanId: scan._id,
+        repoName: scan.repoName,
+        scanDate: scan.scannedAt,
+        language: extractLanguageFromFile(bug.file || bug.filePath || '')
+      }));
+
+      // Apply severity filter
+      let filteredBugs = transformedBugs;
+      if (severity && severity !== 'all') {
+        filteredBugs = filteredBugs.filter(bug => 
+          (bug.severity || 'info').toLowerCase() === severity.toLowerCase()
+        );
+      }
+
+      // Apply language filter
+      if (language && language !== 'all') {
+        filteredBugs = filteredBugs.filter(bug => bug.language === language);
+      }
+
+      allBugs.push(...filteredBugs);
+    });
+
+    // Calculate metrics
+    const totalBugs = allBugs.length;
+    const totalRepos = new Set(scans.map(s => s.repoName)).size;
+    const avgBugsPerScan = scans.length > 0 ? (totalBugs / scans.length).toFixed(1) : '0.0';
+
+    // Severity distribution
+    const severityCount = { critical: 0, major: 0, minor: 0, info: 0 };
+    allBugs.forEach(bug => {
+      const severity = (bug.severity || 'info').toLowerCase();
+      if (severityCount[severity] !== undefined) {
+        severityCount[severity]++;
+      } else {
+        severityCount.info++;
+      }
+    });
+
+    // Timeline data (daily aggregation)
+    const timelineData = {};
+    for (let d = new Date(startDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      timelineData[dateKey] = { date: dateKey, total: 0, critical: 0, major: 0, minor: 0, info: 0 };
+    }
+
+    allBugs.forEach(bug => {
+      const dateKey = new Date(bug.scanDate).toISOString().split('T')[0];
+      if (timelineData[dateKey]) {
+        timelineData[dateKey].total++;
+        const severity = (bug.severity || 'info').toLowerCase();
+        if (timelineData[dateKey][severity] !== undefined) {
+          timelineData[dateKey][severity]++;
+        } else {
+          timelineData[dateKey].info++;
+        }
+      }
+    });
+
+    // Repository stats
+    const repoStats = {};
+    allBugs.forEach(bug => {
+      const repo = bug.repoName || 'Unknown';
+      if (!repoStats[repo]) {
+        repoStats[repo] = { name: repo, bugs: 0, critical: 0, major: 0, minor: 0, info: 0 };
+      }
+      repoStats[repo].bugs++;
+      const severity = (bug.severity || 'info').toLowerCase();
+      if (repoStats[repo][severity] !== undefined) {
+        repoStats[repo][severity]++;
+      } else {
+        repoStats[repo].info++;
+      }
+    });
+
+    // File stats
+    const fileStats = {};
+    allBugs.forEach(bug => {
+      const file = bug.file || bug.filePath || 'Unknown';
+      if (!fileStats[file]) {
+        fileStats[file] = { file, bugs: 0 };
+      }
+      fileStats[file].bugs++;
+    });
+
+    // Get unique repositories and languages for filters
+    const uniqueRepos = ['all', ...new Set(scans.map(s => s.repoName).filter(Boolean))];
+    const uniqueLanguages = ['all', ...new Set(allBugs.map(b => b.language).filter(Boolean))];
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalBugs,
+          totalRepos,
+          avgBugsPerScan: parseFloat(avgBugsPerScan),
+          totalScans: scans.length
+        },
+        severityDistribution: Object.entries(severityCount)
+          .filter(([_, count]) => count > 0)
+          .map(([name, value]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            value,
+            color: getSeverityColor(name)
+          })),
+        timeline: Object.values(timelineData).sort((a, b) => new Date(a.date) - new Date(b.date)),
+        topRepositories: Object.values(repoStats)
+          .sort((a, b) => b.bugs - a.bugs)
+          .slice(0, 10),
+        topFiles: Object.values(fileStats)
+          .sort((a, b) => b.bugs - a.bugs)
+          .slice(0, 15),
+        filters: {
+          repositories: uniqueRepos,
+          languages: uniqueLanguages
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('🚨 Error fetching analytics overview:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error. Please try again later.' 
+    });
+  }
+});
+
+// 🆕 NEW API: GET /api/scan/analytics/repositories - Get repository analytics
+router.get('/analytics/repositories', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const repositories = await Scan.aggregate([
+      { $match: { userId, status: 'completed' } },
+      {
+        $group: {
+          _id: '$repoName',
+          totalScans: { $sum: 1 },
+          totalBugs: { $sum: '$scanResults.totalBugs' },
+          totalFiles: { $sum: '$scanResults.filesScanned' },
+          lastScan: { $max: '$scannedAt' },
+          avgBugs: { $avg: '$scanResults.totalBugs' }
+        }
+      },
+      { $sort: { totalBugs: -1 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: repositories.map(repo => ({
+        name: repo._id,
+        totalScans: repo.totalScans,
+        totalBugs: repo.totalBugs || 0,
+        totalFiles: repo.totalFiles || 0,
+        lastScan: repo.lastScan,
+        avgBugs: Math.round(repo.avgBugs || 0)
+      }))
+    });
+
+  } catch (error) {
+    console.error('🚨 Error fetching repository analytics:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error. Please try again later.' 
+    });
+  }
+});
+
+// DELETE /api/scan/:scanId - Delete a scan
+router.delete('/:scanId', auth, async (req, res) => {
+  try {
+    const { scanId } = req.params;
+    const userId = req.user.id;
+
+    const scan = await Scan.findOneAndDelete({ _id: scanId, userId });
+
+    if (!scan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Scan not found or access denied'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Scan deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('🚨 Error deleting scan:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error. Please try again later.' 
+    });
+  }
+});
+
+// Helper functions
+function extractLanguageFromFile(filePath) {
+  if (!filePath) return null;
+  
+  const extension = filePath.split('.').pop()?.toLowerCase();
+  const languageMap = {
+    'js': 'JavaScript',
+    'jsx': 'JavaScript',
+    'ts': 'TypeScript',
+    'tsx': 'TypeScript',
+    'py': 'Python',
+    'java': 'Java',
+    'php': 'PHP',
+    'go': 'Go',
+    'rs': 'Rust',
+    'cpp': 'C++',
+    'cc': 'C++',
+    'cxx': 'C++',
+    'c': 'C',
+    'cs': 'C#',
+    'rb': 'Ruby',
+    'swift': 'Swift',
+    'kt': 'Kotlin',
+    'scala': 'Scala',
+    'dart': 'Dart',
+    'vue': 'Vue',
+    'html': 'HTML',
+    'css': 'CSS',
+    'scss': 'SCSS',
+    'sass': 'SASS',
+    'less': 'LESS'
+  };
+  
+  return languageMap[extension] || null;
+}
+
+function getSeverityColor(severity) {
+  const colors = {
+    critical: '#ef4444',
+    major: '#f97316', 
+    minor: '#eab308',
+    info: '#3b82f6'
+  };
+  return colors[severity.toLowerCase()] || '#3b82f6';
+}
+
+module.exports = router;

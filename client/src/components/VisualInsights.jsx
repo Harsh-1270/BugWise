@@ -9,9 +9,37 @@ const VisualInsightsPage = () => {
   const [severityFilter, setSeverityFilter] = useState('all');
   const [selectedRepo, setSelectedRepo] = useState('all');
   const [languageFilter, setLanguageFilter] = useState('all');
+  const [error, setError] = useState(null);
+
+  // Real data states
+  const [rawScans, setRawScans] = useState([]); // Store all raw scan data
+  const [timelineData, setTimelineData] = useState([]);
+  const [severityDistribution, setSeverityDistribution] = useState([]);
+  const [repoData, setRepoData] = useState([]);
+  const [fileData, setFileData] = useState([]);
+  const [repositories, setRepositories] = useState(['all']);
+  const [languages, setLanguages] = useState(['all']);
+  const [totalBugs, setTotalBugs] = useState(0);
+  const [totalRepos, setTotalRepos] = useState(0);
+  const [avgBugsPerScan, setAvgBugsPerScan] = useState(0);
+  const [totalScans, setTotalScans] = useState(0);
+  const [rawBugs, setRawBugs] = useState([]); // Store all raw bug data
+
+  // Footer Component
+  const Footer = () => {
+    return (
+      <footer className="relative mt-8">
+        <div className="max-w-7xl mx-auto px-5 lg:px-7.5 xl:px-10 py-12">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-n-4 text-sm">© 2025 BugWise. All rights reserved.</p>
+            <p className="text-n-4 text-sm mt-2 md:mt-0">Made with ❤️ for developers</p>
+          </div>
+        </div>
+      </footer>
+    );
+  };
 
   const [user, setUser] = useState(() => {
-    // Get user data from localStorage or your auth system
     const userData = localStorage.getItem('userData');
     if (userData) {
       try {
@@ -23,75 +51,250 @@ const VisualInsightsPage = () => {
     return { name: 'User', email: 'user@example.com' };
   });
 
-  // Mock data for visualizations
-  const timelineData = [
-    { date: '2024-01-01', total: 15, critical: 3, major: 7, minor: 5 },
-    { date: '2024-01-08', total: 22, critical: 5, major: 10, minor: 7 },
-    { date: '2024-01-15', total: 18, critical: 2, major: 8, minor: 8 },
-    { date: '2024-01-22', total: 28, critical: 8, major: 12, minor: 8 },
-    { date: '2024-01-29', total: 16, critical: 4, major: 6, minor: 6 },
-    { date: '2024-02-05', total: 35, critical: 12, major: 15, minor: 8 },
-    { date: '2024-02-12', total: 24, critical: 6, major: 11, minor: 7 },
-    { date: '2024-02-19', total: 31, critical: 9, major: 14, minor: 8 }
-  ];
+  // Utility function to get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  };
 
-  const severityDistribution = [
-    { name: 'Critical', value: 49, color: '#ef4444' },
-    { name: 'Major', value: 83, color: '#f97316' },
-    { name: 'Minor', value: 57, color: '#eab308' }
-  ];
+  // API call function with auth
+  const apiCall = async (url, options = {}) => {
+    const token = getAuthToken();
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
 
-  const repoData = [
-    { name: 'e-commerce-app', bugs: 45, critical: 12, major: 20, minor: 13 },
-    { name: 'user-auth-service', bugs: 32, critical: 8, major: 15, minor: 9 },
-    { name: 'payment-gateway', bugs: 28, critical: 15, major: 8, minor: 5 },
-    { name: 'inventory-system', bugs: 24, critical: 6, major: 11, minor: 7 },
-    { name: 'notification-api', bugs: 20, critical: 4, major: 9, minor: 7 }
-  ];
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.status}`);
+    }
 
-  const fileData = [
-    { file: '/src/components/Login.jsx', bugs: 18 },
-    { file: '/utils/payment-processor.js', bugs: 15 },
-    { file: '/src/components/Dashboard.jsx', bugs: 12 },
-    { file: '/utils/validation.js', bugs: 11 },
-    { file: '/src/api/user-service.js', bugs: 9 },
-    { file: '/components/ProductList.jsx', bugs: 8 },
-    { file: '/utils/database-helper.js', bugs: 7 }
-  ];
+    return response.json();
+  };
 
-  const repositories = [
-    'all',
-    'e-commerce-app',
-    'user-auth-service',
-    'payment-gateway',
-    'inventory-system',
-    'notification-api'
-  ];
+  // Fetch all scan data
+  const fetchScanData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-  const languages = ['all', 'JavaScript', 'Python', 'Java', 'TypeScript', 'PHP'];
+      // Fetch scan history with a large limit to get all data
+      const historyResponse = await apiCall('/api/scan/history?limit=1000&sortBy=createdAt&sortOrder=asc');
+      
+      if (!historyResponse.success) {
+        throw new Error('Failed to fetch scan history');
+      }
 
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
+      const scans = historyResponse.data.filter(scan => scan.status === 'completed');
+      
+      // Process timeline data
+      processTimelineData(scans);
+      
+      // Process severity distribution
+      processSeverityDistribution(scans);
+      
+      // Process repository data
+      processRepositoryData(scans);
+      
+      // Process file data (this will be estimated since we don't have individual file data)
+      processFileData(scans);
+      
+      // Update repositories list
+      updateRepositoriesList(scans);
+      
+      // Calculate summary metrics
+      calculateSummaryMetrics(scans);
+
+    } catch (err) {
+      console.error('Error fetching scan data:', err);
+      setError(err.message);
+    } finally {
       setIsLoading(false);
-    }, 200);
-    return () => clearTimeout(timer);
+    }
+  };
+
+  // Process severity distribution for pie chart
+  const processSeverityDistribution = (scans) => {
+    let totalBugs = 0;
+    scans.forEach(scan => {
+      totalBugs += scan.totalBugs || 0;
+    });
+
+    // Estimate severity distribution based on common patterns
+    const estimatedCritical = Math.floor(totalBugs * 0.2);
+    const estimatedMajor = Math.floor(totalBugs * 0.5);
+    const estimatedMinor = totalBugs - estimatedCritical - estimatedMajor;
+
+    setSeverityDistribution([
+      { name: 'Critical', value: estimatedCritical, color: '#ef4444' },
+      { name: 'Major', value: estimatedMajor, color: '#f97316' },
+      { name: 'Minor', value: estimatedMinor, color: '#eab308' }
+    ]);
+  };
+
+  // Process repository data for bar chart
+  const processRepositoryData = (scans) => {
+    const repoMap = {};
+    
+    scans.forEach(scan => {
+      const repoName = scan.repoName || 'Unknown';
+      if (!repoMap[repoName]) {
+        repoMap[repoName] = { name: repoName, bugs: 0, critical: 0, major: 0, minor: 0 };
+      }
+      
+      const totalBugs = scan.totalBugs || 0;
+      repoMap[repoName].bugs += totalBugs;
+      
+      // Estimate severity distribution
+      const estimatedCritical = Math.floor(totalBugs * 0.2);
+      const estimatedMajor = Math.floor(totalBugs * 0.5);
+      const estimatedMinor = totalBugs - estimatedCritical - estimatedMajor;
+      
+      repoMap[repoName].critical += estimatedCritical;
+      repoMap[repoName].major += estimatedMajor;
+      repoMap[repoName].minor += estimatedMinor;
+    });
+    
+    const repoArray = Object.values(repoMap)
+      .sort((a, b) => b.bugs - a.bugs)
+      .slice(0, 10); // Top 10 repositories
+      
+    setRepoData(repoArray);
+  };
+
+  // Process file data (estimated since we don't have individual file data)
+  const processFileData = (scans) => {
+    // Generate estimated file data based on common file patterns
+    const commonFiles = [
+      '/src/components/Login.jsx',
+      '/utils/payment-processor.js',
+      '/src/components/Dashboard.jsx',
+      '/utils/validation.js',
+      '/src/api/user-service.js',
+      '/components/ProductList.jsx',
+      '/utils/database-helper.js'
+    ];
+    
+    const totalBugs = scans.reduce((sum, scan) => sum + (scan.totalBugs || 0), 0);
+    
+    const estimatedFileData = commonFiles.map((file, index) => ({
+      file,
+      bugs: Math.floor((totalBugs / commonFiles.length) * (1 - index * 0.1))
+    }));
+    
+    setFileData(estimatedFileData);
+  };
+
+  // Update repositories list
+  const updateRepositoriesList = (scans) => {
+    const uniqueRepos = ['all', ...new Set(scans.map(scan => scan.repoName).filter(Boolean))];
+    setRepositories(uniqueRepos);
+  };
+
+  // Calculate summary metrics
+  const calculateSummaryMetrics = (scans) => {
+    const totalBugsCount = scans.reduce((sum, scan) => sum + (scan.totalBugs || 0), 0);
+    const uniqueRepos = new Set(scans.map(scan => scan.repoName).filter(Boolean));
+    const avgBugs = scans.length > 0 ? (totalBugsCount / scans.length).toFixed(1) : '0.0';
+    
+    setTotalBugs(totalBugsCount);
+    setTotalRepos(uniqueRepos.size);
+    setAvgBugsPerScan(avgBugs);
+  };
+
+  // Filter data based on current filters
+  const getFilteredData = (data, filterKey = 'name') => {
+    if (selectedRepo === 'all') return data;
+    return data.filter(item => item[filterKey] === selectedRepo);
+  };
+
+
+
+  // Fetch data using your actual API endpoints
+  const fetchAnalyticsData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        dateRange: dateRange,
+        severity: severityFilter,
+        repository: selectedRepo,
+        language: languageFilter
+      });
+
+      // Use your actual analytics overview endpoint
+      const response = await apiCall(`/api/scan/analytics/overview?${params}`);
+      
+      if (!response.success) {
+        throw new Error('Failed to fetch analytics data');
+      }
+
+      const data = response.data;
+
+      // Set summary metrics
+      setTotalBugs(data.summary.totalBugs);
+      setTotalRepos(data.summary.totalRepos);
+      setAvgBugsPerScan(data.summary.avgBugsPerScan);
+      setTotalScans(data.summary.totalScans);
+
+      // Set chart data
+      setSeverityDistribution(data.severityDistribution);
+      setTimelineData(data.timeline);
+      setRepoData(data.topRepositories);
+      setFileData(data.topFiles);
+
+      // Set filter options
+      setRepositories(data.filters.repositories);
+      setLanguages(data.filters.languages);
+
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Re-fetch data when filters change
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [dateRange, severityFilter, selectedRepo, languageFilter]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchAnalyticsData();
   }, []);
 
   const handleLogout = () => {
-    // Clear all user-related data
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
     sessionStorage.removeItem('authToken');
     sessionStorage.removeItem('userData');
-
-    // Redirect to login page
     window.location.href = '/';
   };
 
-  const totalBugs = severityDistribution.reduce((sum, item) => sum + item.value, 0);
-  const totalRepos = repoData.length;
-  const avgBugsPerScan = (totalBugs / timelineData.length).toFixed(1);
+  if (error) {
+    return (
+      <div className="min-h-screen bg-n-8 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-400 text-lg mb-2">Error loading data</p>
+          <p className="text-n-3 mb-4">{error}</p>
+          <button 
+            onClick={fetchAnalyticsData}
+            className="px-6 py-2 bg-color-1 text-white rounded-xl hover:bg-color-1/80 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -147,7 +350,7 @@ const VisualInsightsPage = () => {
           </div>
 
           {/* Summary Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -155,7 +358,7 @@ const VisualInsightsPage = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-red-400">Total Bugs Found</p>
-                  <p className="text-3xl font-bold text-n-1">{totalBugs}</p>
+                  <p className="text-3xl font-bold text-n-1">{totalBugs.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -180,6 +383,18 @@ const VisualInsightsPage = () => {
                 <div>
                   <p className="text-sm font-medium text-green-400">Avg. Bugs per Scan</p>
                   <p className="text-3xl font-bold text-n-1">{avgBugsPerScan}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <Clock className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-400">Total Scans</p>
+                  <p className="text-3xl font-bold text-n-1">{totalScans}</p>
                 </div>
               </div>
             </div>
@@ -220,6 +435,7 @@ const VisualInsightsPage = () => {
                   <option value="critical">Critical</option>
                   <option value="major">Major</option>
                   <option value="minor">Minor</option>
+                  <option value="info">Info</option>
                 </select>
               </div>
 
@@ -262,38 +478,67 @@ const VisualInsightsPage = () => {
             {/* Line Chart - Bugs Over Time */}
             <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-n-1 flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <TrendingUp className="w-5 h-5 text-color-1" />
-                  Bugs Found Over Time
-                </h3>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 text-n-1 rounded-xl hover:bg-white/15 transition-colors">
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
+                  <h3 className="text-lg font-semibold text-white">Bug Trends Over Time</h3>
+                </div>
               </div>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#9CA3AF"
-                    fontSize={12}
-                  />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: '1px solid #374151',
-                      borderRadius: '12px',
-                      color: '#F9FAFB'
-                    }}
-                  />
-                  <Line type="monotone" dataKey="total" stroke="#8B5CF6" strokeWidth={3} name="Total" />
-                  <Line type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={2} name="Critical" />
-                  <Line type="monotone" dataKey="major" stroke="#f97316" strokeWidth={2} name="Major" />
-                  <Line type="monotone" dataKey="minor" stroke="#eab308" strokeWidth={2} name="Minor" />
-                </LineChart>
-              </ResponsiveContainer>
+
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={timelineData}>
+                    <defs>
+                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorCritical" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#9CA3AF" 
+                      fontSize={12}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <YAxis stroke="#9CA3AF" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        border: '1px solid rgba(75, 85, 99, 0.3)',
+                        borderRadius: '12px',
+                        color: '#F3F4F6',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#8B5CF6"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#colorTotal)"
+                      dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2 }}
+                    />
+                    {severityFilter === 'all' && (
+                      <Area
+                        type="monotone"
+                        dataKey="critical"
+                        stroke="#ef4444"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorCritical)"
+                        dot={{ fill: '#ef4444', strokeWidth: 2, r: 3 }}
+                      />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Charts Row */}
@@ -320,16 +565,14 @@ const VisualInsightsPage = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E5E7EB',
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        border: '1px solid rgba(75, 85, 99, 0.3)',
                         borderRadius: '12px',
-                        color: '#111827',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-                        fontSize: '14px',
-                        fontWeight: '500'
+                        color: '#F3F4F6',
+                        backdropFilter: 'blur(10px)'
                       }}
                       labelStyle={{
-                        color: '#374151',
+                        color: '#F3F4F6',
                         fontWeight: '600'
                       }}
                     />
@@ -337,65 +580,52 @@ const VisualInsightsPage = () => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Bar Chart - Top Buggy Repositories */}
+              {/* Bar Chart - Top Repositories */}
               <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
-                <h3 className="text-xl font-bold text-n-1 mb-6 flex items-center gap-2">
+                <div className="flex items-center gap-3 mb-6">
                   <BarChart3 className="w-5 h-5 text-color-1" />
-                  Top Buggy Repositories
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={repoData} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis type="number" stroke="#9CA3AF" />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="#9CA3AF"
-                      fontSize={12}
-                      width={120}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1F2937',
-                        border: '1px solid #374151',
-                        borderRadius: '12px',
-                        color: '#F9FAFB'
-                      }}
-                    />
-                    <Bar dataKey="bugs" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+                  <h3 className="text-lg font-semibold text-white">Top Buggy Repositories</h3>
+                </div>
 
-            {/* Horizontal Bar Chart - Top Buggy Files */}
-            <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
-              <h3 className="text-xl font-bold text-n-1 mb-6 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-color-1" />
-                Buggiest Files
-              </h3>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={fileData} layout="horizontal">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis type="number" stroke="#9CA3AF" />
-                  <YAxis
-                    type="category"
-                    dataKey="file"
-                    stroke="#9CA3AF"
-                    fontSize={11}
-                    width={200}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: '1px solid #374151',
-                      borderRadius: '12px',
-                      color: '#F9FAFB'
-                    }}
-                  />
-                  <Bar dataKey="bugs" fill="#f97316" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={repoData} layout="horizontal">
+                      <defs>
+                        <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#8B5CF6" />
+                          <stop offset="100%" stopColor="#3B82F6" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                      <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        stroke="#9CA3AF" 
+                        fontSize={10}
+                        width={100}
+                        tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                          border: '1px solid rgba(75, 85, 99, 0.3)',
+                          borderRadius: '12px',
+                          color: '#F3F4F6',
+                          backdropFilter: 'blur(10px)'
+                        }}
+                        formatter={(value, name) => [value, 'Bugs']}
+                        labelFormatter={(label) => `Repository: ${label}`}
+                      />
+                      <Bar 
+                        dataKey="bugs" 
+                        fill="url(#barGradient)"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
             {/* Stacked Area Chart - Bug Severity per Repo */}
@@ -418,21 +648,44 @@ const VisualInsightsPage = () => {
                   <YAxis stroke="#9CA3AF" />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: '1px solid #374151',
+                      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                      border: '1px solid rgba(75, 85, 99, 0.3)',
                       borderRadius: '12px',
-                      color: '#F9FAFB'
+                      color: '#F3F4F6',
+                      backdropFilter: 'blur(10px)'
                     }}
                   />
-                  <Bar dataKey="critical" stackId="a" fill="#ef4444" name="Critical" />
-                  <Bar dataKey="major" stackId="a" fill="#f97316" name="Major" />
-                  <Bar dataKey="minor" stackId="a" fill="#eab308" name="Minor" />
+                  <Bar dataKey="criticalBugs" stackId="a" fill="#ef4444" name="Critical" />
+                  <Bar dataKey="majorBugs" stackId="a" fill="#f97316" name="Major" />
+                  <Bar dataKey="minorBugs" stackId="a" fill="#eab308" name="Minor" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+
+            {/* Export Options */}
+            <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Download className="w-5 h-5 text-color-1" />
+                  <h3 className="text-lg font-semibold text-white">Export Data</h3>
+                </div>
+                <div className="flex gap-3">
+                  <button className="px-4 py-2 bg-gradient-to-r from-color-1 to-purple-500 text-white rounded-xl hover:from-color-1/80 hover:to-purple-500/80 transition-all duration-200 font-medium">
+                    Export CSV
+                  </button>
+                  <button className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-500/80 hover:to-emerald-500/80 transition-all duration-200 font-medium">
+                    Export PDF
+                  </button>
+                </div>
+              </div>
+              <p className="text-n-3 text-sm mt-2">
+                Export your visual insights data for further analysis or reporting.
+              </p>
+            </div>
+          </div>  
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

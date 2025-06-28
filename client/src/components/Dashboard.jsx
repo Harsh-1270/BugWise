@@ -55,6 +55,8 @@ const TypingEffect = ({ text, speed = 100, delay = 0 }) => {
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recentScans, setRecentScans] = useState([]);
+  const [recentScansLoading, setRecentScansLoading] = useState(true);
   const navigate = useNavigate(); // Add navigation hook
 
   // Function to get user data from various sources
@@ -115,12 +117,145 @@ const Dashboard = () => {
     }
   };
 
+
+  const Footer = () => {
+  return (
+    <footer className="relative mt-4">
+      <div className="max-w-7xl mx-auto px-5 lg:px-7.5 xl:px-10 py-12">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <p className="text-n-4 text-sm">© 2025 BugWise. All rights reserved.</p>
+          <p className="text-n-4 text-sm mt-2 md:mt-0">Made with ❤️ for developers</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+  // Function to get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  };
+
+  // Function to fetch recent scan history
+  const fetchRecentScans = async () => {
+    try {
+      setRecentScansLoading(true);
+      const token = getAuthToken();
+      
+      if (!token) {
+        console.warn('No auth token found');
+        setRecentScans([]);
+        return;
+      }
+
+      const response = await fetch('/api/scan/history?limit=3&sortBy=createdAt&sortOrder=desc', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired or invalid, redirect to login
+          handleLogout();
+          return;
+        }
+        throw new Error(`Failed to fetch scan history: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setRecentScans(data.data);
+      } else {
+        console.warn('No scan data received:', data);
+        setRecentScans([]);
+      }
+    } catch (error) {
+      console.error('Error fetching recent scans:', error);
+      setRecentScans([]);
+    } finally {
+      setRecentScansLoading(false);
+    }
+  };
+
+  // Function to format relative time
+  const getRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) {
+      return 'Just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else if (diffInSeconds < 2592000) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} day${days > 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Function to get status color and icon
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case 'completed':
+        return {
+          color: 'text-green-400',
+          bgColor: 'bg-green-400/10',
+          icon: '✓',
+          text: 'Completed'
+        };
+      case 'failed':
+        return {
+          color: 'text-red-400',
+          bgColor: 'bg-red-400/10',
+          icon: '✗',
+          text: 'Failed'
+        };
+      case 'scanning':
+        return {
+          color: 'text-blue-400',
+          bgColor: 'bg-blue-400/10',
+          icon: '⟳',
+          text: 'Scanning'
+        };
+      case 'pending':
+        return {
+          color: 'text-yellow-400',
+          bgColor: 'bg-yellow-400/10',
+          icon: '⏳',
+          text: 'Pending'
+        };
+      default:
+        return {
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-400/10',
+          icon: '?',
+          text: 'Unknown'
+        };
+    }
+  };
+
   // Load user data on component mount
   useEffect(() => {
     const userData = getUserData();
     setUser(userData);
     setLoading(false);
   }, []);
+
+  // Fetch recent scans when component mounts
+  useEffect(() => {
+    if (!loading && user) {
+      fetchRecentScans();
+    }
+  }, [loading, user]);
 
   // Function to update user data (can be called from parent components or context)
   const updateUser = (newUserData) => {
@@ -284,35 +419,84 @@ const Dashboard = () => {
 
           {/* Recent Activity Section */}
           <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
-            <h2 className="text-2xl font-semibold text-n-1 mb-6">Recent Activity</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold text-n-1">Recent Activity</h2>
+              <button 
+                onClick={fetchRecentScans}
+                className="text-n-3 hover:text-n-1 transition-colors"
+                disabled={recentScansLoading}
+              >
+                <svg className={`w-5 h-5 ${recentScansLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
+            
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
-                <div>
-                  <p className="text-n-1 font-medium">Code scan completed</p>
-                  <p className="text-n-3 text-sm">React Project - 3 bugs found</p>
+              {recentScansLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-color-1"></div>
                 </div>
-                <span className="text-n-3 text-sm">2 hours ago</span>
-              </div>
+              ) : recentScans.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-n-3">No recent scans found</p>
+                  <p className="text-n-4 text-sm mt-2">Start scanning your code to see activity here</p>
+                </div>
+              ) : (
+                recentScans.map((scan) => {
+                  const statusInfo = getStatusInfo(scan.status);
+                  return (
+                    <div 
+                      key={scan.scanId}
+                      className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/scan-details/${scan.scanId}`)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-8 h-8 ${statusInfo.bgColor} rounded-full flex items-center justify-center text-sm ${statusInfo.color}`}>
+                          {statusInfo.icon}
+                        </div>
+                        <div>
+                          <p className="text-n-1 font-medium">
+                            {scan.status === 'completed' ? 'Code scan completed' : 
+                             scan.status === 'failed' ? 'Code scan failed' :
+                             scan.status === 'scanning' ? 'Code scan in progress' :
+                             'Code scan initiated'}
+                          </p>
+                          <p className="text-n-3 text-sm">
+                            {scan.repoName} - {scan.status === 'completed' ? 
+                              `${scan.totalBugs || 0} bug${scan.totalBugs !== 1 ? 's' : ''} found` :
+                              scan.status === 'failed' ? 
+                              (scan.error ? `Error: ${scan.error.substring(0, 50)}${scan.error.length > 50 ? '...' : ''}` : 'Scan failed') :
+                              statusInfo.text}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-n-3 text-sm">{getRelativeTime(scan.createdAt)}</span>
+                        {scan.status === 'completed' && scan.filesScanned && (
+                          <p className="text-n-4 text-xs mt-1">{scan.filesScanned} files scanned</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               
-              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
-                <div>
-                  <p className="text-n-1 font-medium">GitHub repository connected</p>
-                  <p className="text-n-3 text-sm">my-awesome-project</p>
+              {recentScans.length > 0 && (
+                <div className="text-center pt-4">
+                  <button 
+                    onClick={() => handleCardClick('history')}
+                    className="text-color-1 hover:text-color-2 transition-colors text-sm font-medium"
+                  >
+                    View all scan history →
+                  </button>
                 </div>
-                <span className="text-n-3 text-sm">1 day ago</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
-                <div>
-                  <p className="text-n-1 font-medium">Profile updated</p>
-                  <p className="text-n-3 text-sm">Email preferences changed</p>
-                </div>
-                <span className="text-n-3 text-sm">3 days ago</span>
-              </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
