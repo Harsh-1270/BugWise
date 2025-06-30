@@ -18,6 +18,7 @@ import ProfilePage from "./components/ProfilePage";
 import DetectBugsPage from "./components/DetectBugsPage";
 import BugHistory from './components/BugHistory';
 import VisualInsights from './components/VisualInsights';
+import DocsPage from "./components/DocsPage";
 
 axios.defaults.baseURL = 'http://localhost:8000'
 axios.defaults.withCredentials = true
@@ -91,7 +92,7 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage user={user} onLogout={handleLogout} />} />
           <Route path='/bug-history' element={<BugHistory user={user}/>}/>
           <Route path='/visual-insights' element={<VisualInsights user={user}/>}/>
-          <Route path="/docspage" element={<Navigate to="/docspage" /> }/>
+          <Route path="/docspage" element={<DocsPage user={user}/> }/>
           <Route path="*" element={<Navigate to="/dashboard" />}/>
         </Routes>
       </>

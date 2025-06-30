@@ -45,15 +45,15 @@ const DocsPage = () => {
   };
 
   const sections = [
-    { id: 'getting-started', title: '🚀 Getting Started', icon: Zap },
-    { id: 'how-it-works', title: '🤖 How Bug Detection Works', icon: Bug },
-    { id: 'severity-levels', title: '📊 Bug Severity Levels', icon: Target },
-    { id: 'reading-results', title: '🧾 Reading Scan Results', icon: FileText },
-    { id: 'bug-history', title: '🕒 Bug History Guide', icon: Clock },
-    { id: 'visual-insights', title: '📈 Visual Insights Guide', icon: BarChart3 },
-    { id: 'account-security', title: '🔐 Account & Security', icon: Shield },
-    { id: 'faq', title: '❓ FAQ', icon: HelpCircle },
-    { id: 'contact', title: '📬 Contact & Support', icon: MessageCircle }
+    { id: 'getting-started', title: 'Getting Started', icon: Zap },
+    { id: 'how-it-works', title: 'How Bug Detection Works', icon: Bug },
+    { id: 'severity-levels', title: 'Bug Severity Levels', icon: Target },
+    { id: 'reading-results', title: 'Reading Scan Results', icon: FileText },
+    { id: 'bug-history', title: 'Bug History Guide', icon: Clock },
+    { id: 'visual-insights', title: 'Visual Insights Guide', icon: BarChart3 },
+    { id: 'account-security', title: 'Account & Security', icon: Shield },
+    { id: 'faq', title: 'FAQ', icon: HelpCircle },
+    { id: 'contact', title: 'Contact & Support', icon: MessageCircle }
   ];
 
   const faqData = [
@@ -124,11 +124,11 @@ const DocsPage = () => {
       <div className="pt-32 px-5 lg:px-7.5 xl:px-10 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Header Section */}
-          <div className="mb-12 text-center">
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-color-1/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-                <BookOpen className="w-8 h-8 text-color-1" />
-              </div>
+          <div className="mb-12 text-left">
+            <div className="flex items-left justify-left gap-4 mb-6">
+              {/* <div className="w-16 h-16 bg-gradient-to-br from-color-1/20 to-purple-500/20 rounded-2xl flex items-left justify-left"> */}
+                {/* <BookOpen className="w-8 h-8 text-color-1" /> */}
+              {/* </div> */}
               <div>
                 <h1 className="text-5xl lg:text-7xl font-bold bg-gradient-to-r from-white via-color-1 to-purple-400 bg-clip-text text-transparent mb-2">
                   Documentation
@@ -180,7 +180,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-xl flex items-center justify-center">
                       <Zap className="w-6 h-6 text-green-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">🚀 Getting Started</h2>
+                    <h2 className="text-3xl font-bold text-white">Getting Started</h2>
                   </div>
                   
                   <div className="space-y-6">
@@ -250,7 +250,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex items-center justify-center">
                       <Bug className="w-6 h-6 text-purple-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">🤖 How Bug Detection Works</h2>
+                    <h2 className="text-3xl font-bold text-white">How Bug Detection Works</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -319,7 +319,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-xl flex items-center justify-center">
                       <Target className="w-6 h-6 text-red-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">📊 Bug Severity Levels</h2>
+                    <h2 className="text-3xl font-bold text-white">Bug Severity Levels</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -403,7 +403,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center">
                       <FileText className="w-6 h-6 text-blue-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">🧾 Reading Scan Results</h2>
+                    <h2 className="text-3xl font-bold text-white">Reading Scan Results</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -511,7 +511,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
                       <Clock className="w-6 h-6 text-cyan-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">🕒 Bug History Guide</h2>
+                    <h2 className="text-3xl font-bold text-white">Bug History Guide</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -571,7 +571,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-red-500/20 rounded-xl flex items-center justify-center">
                       <BarChart3 className="w-6 h-6 text-pink-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">📈 Visual Insights Guide</h2>
+                    <h2 className="text-3xl font-bold text-white">Visual Insights Guide</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -638,7 +638,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl flex items-center justify-center">
                       <Shield className="w-6 h-6 text-green-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">🔐 Account & Security</h2>
+                    <h2 className="text-3xl font-bold text-white">Account & Security</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -707,7 +707,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-xl flex items-center justify-center">
                       <HelpCircle className="w-6 h-6 text-yellow-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">❓ Frequently Asked Questions</h2>
+                    <h2 className="text-3xl font-bold text-white">Frequently Asked Questions</h2>
                   </div>
 
                   <div className="space-y-4">
@@ -740,7 +740,7 @@ const DocsPage = () => {
                     <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl flex items-center justify-center">
                       <MessageCircle className="w-6 h-6 text-indigo-400" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white">📬 Contact & Support</h2>
+                    <h2 className="text-3xl font-bold text-white">Contact & Support</h2>
                   </div>
 
                   <div className="space-y-6">
@@ -755,8 +755,8 @@ const DocsPage = () => {
                         </div>
                         <h3 className="text-lg font-semibold text-n-1 mb-2">Email Support</h3>
                         <p className="text-n-3 text-sm mb-3">Get personalized help with your account or technical issues.</p>
-                        <a href="mailto:support@bugwise.dev" className="text-color-1 text-sm font-medium hover:underline">
-                          support@bugwise.dev
+                        <a href="mailto:harshp1270@gmail.com" className="text-color-1 text-sm font-medium hover:underline">
+                          harshp1270@gmail.com
                         </a>
                       </div>
 

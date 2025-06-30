@@ -7,7 +7,7 @@ const bugSchema = new mongoose.Schema({
   },
   severity: {
     type: String,
-    enum: ['Critical', 'Major', 'Minor', 'Unknown'],
+    enum: ['critical', 'major', 'minor', 'unknown'],
     required: true
   },
   category: {

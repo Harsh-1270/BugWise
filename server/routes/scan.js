@@ -424,34 +424,14 @@ router.get('/status/:scanId', auth, async (req, res) => {
     }
   });
 
-// 🆕 NEW API: GET /api/scan/:scanId/bugs - Get detailed bugs for a specific scan
-
+  // 🆕 NEW API: GET /api/scan/:scanId/bugs - Get detailed bugs for a specific scan
 router.get('/:scanId/bugs', auth, async (req, res) => {
   try {
     const { scanId } = req.params;
     const userId = req.user.id;
 
-    // Validate scanId parameter
-    if (!scanId || scanId === 'undefined' || scanId === 'null') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid scan ID provided'
-      });
-    }
-
-    // Validate ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(scanId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid scan ID format'
-      });
-    }
-
     // Verify scan ownership
-    const scan = await Scan.findOne({ 
-      _id: new mongoose.Types.ObjectId(scanId), 
-      userId 
-    });
+    const scan = await Scan.findOne({ _id: scanId, userId });
 
     if (!scan) {
       return res.status(404).json({
@@ -477,7 +457,7 @@ router.get('/:scanId/bugs', auth, async (req, res) => {
       filePath: bug.filePath || bug.file,
       line: bug.line || bug.lineNumber,
       column: bug.column,
-      severity: bug.severity || 'info',
+      severity: mapSeverity(bug.severity), // 🔄 UPDATED: Use severity mapping
       type: bug.type || bug.category,
       message: bug.message || bug.description,
       rule: bug.rule || bug.ruleId,
@@ -504,21 +484,13 @@ router.get('/:scanId/bugs', auth, async (req, res) => {
 
   } catch (error) {
     console.error('🚨 Error fetching scan bugs:', error.message);
-    
-    // Handle specific MongoDB errors
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid scan ID format'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error. Please try again later.'
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error. Please try again later.' 
     });
   }
 });
+
 // 🆕 NEW API: GET /api/scan/analytics/overview - Get analytics overview for visual insights
 router.get('/analytics/overview', auth, async (req, res) => {
   try {
@@ -553,6 +525,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       const bugs = scan.scanResults?.bugs || [];
       const transformedBugs = bugs.map(bug => ({
         ...bug,
+        severity: mapSeverity(bug.severity), // 🔄 UPDATED: Use severity mapping
         scanId: scan._id,
         repoName: scan.repoName,
         scanDate: scan.scannedAt,
@@ -563,7 +536,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       let filteredBugs = transformedBugs;
       if (severity && severity !== 'all') {
         filteredBugs = filteredBugs.filter(bug => 
-          (bug.severity || 'info').toLowerCase() === severity.toLowerCase()
+          bug.severity.toLowerCase() === severity.toLowerCase()
         );
       }
 
@@ -580,50 +553,50 @@ router.get('/analytics/overview', auth, async (req, res) => {
     const totalRepos = new Set(scans.map(s => s.repoName)).size;
     const avgBugsPerScan = scans.length > 0 ? (totalBugs / scans.length).toFixed(1) : '0.0';
 
-    // Severity distribution
-    const severityCount = { critical: 0, major: 0, minor: 0, info: 0 };
+    // 🔄 UPDATED: Severity distribution with correct mapping
+    const severityCount = { critical: 0, major: 0, minor: 0, unknown: 0 };
     allBugs.forEach(bug => {
-      const severity = (bug.severity || 'info').toLowerCase();
+      const severity = bug.severity.toLowerCase();
       if (severityCount[severity] !== undefined) {
         severityCount[severity]++;
       } else {
-        severityCount.info++;
+        severityCount.unknown++;
       }
     });
 
-    // Timeline data (daily aggregation)
+    // 🔄 UPDATED: Timeline data with correct severity mapping
     const timelineData = {};
     for (let d = new Date(startDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
       const dateKey = d.toISOString().split('T')[0];
-      timelineData[dateKey] = { date: dateKey, total: 0, critical: 0, major: 0, minor: 0, info: 0 };
+      timelineData[dateKey] = { date: dateKey, total: 0, critical: 0, major: 0, minor: 0, unknown: 0 };
     }
 
     allBugs.forEach(bug => {
       const dateKey = new Date(bug.scanDate).toISOString().split('T')[0];
       if (timelineData[dateKey]) {
         timelineData[dateKey].total++;
-        const severity = (bug.severity || 'info').toLowerCase();
+        const severity = bug.severity.toLowerCase();
         if (timelineData[dateKey][severity] !== undefined) {
           timelineData[dateKey][severity]++;
         } else {
-          timelineData[dateKey].info++;
+          timelineData[dateKey].unknown++;
         }
       }
     });
 
-    // Repository stats
+    // 🔄 UPDATED: Repository stats with correct severity mapping
     const repoStats = {};
     allBugs.forEach(bug => {
       const repo = bug.repoName || 'Unknown';
       if (!repoStats[repo]) {
-        repoStats[repo] = { name: repo, bugs: 0, critical: 0, major: 0, minor: 0, info: 0 };
+        repoStats[repo] = { name: repo, bugs: 0, critical: 0, major: 0, minor: 0, unknown: 0 };
       }
       repoStats[repo].bugs++;
-      const severity = (bug.severity || 'info').toLowerCase();
+      const severity = bug.severity.toLowerCase();
       if (repoStats[repo][severity] !== undefined) {
         repoStats[repo][severity]++;
       } else {
-        repoStats[repo].info++;
+        repoStats[repo].unknown++;
       }
     });
 
@@ -750,6 +723,20 @@ router.delete('/:scanId', auth, async (req, res) => {
   }
 });
 
+// 🆕 NEW HELPER FUNCTION: Map database severity to display severity
+function mapSeverity(dbSeverity) {
+  if (!dbSeverity) return 'unknown';
+  
+  const severityMap = {
+    'critical': 'critical',
+    'high': 'major',
+    'medium': 'minor', 
+    'low': 'unknown'
+  };
+  
+  return severityMap[dbSeverity.toLowerCase()] || 'unknown';
+}
+
 // Helper functions
 function extractLanguageFromFile(filePath) {
   if (!filePath) return null;
@@ -786,14 +773,15 @@ function extractLanguageFromFile(filePath) {
   return languageMap[extension] || null;
 }
 
+// 🔄 UPDATED: Severity color mapping
 function getSeverityColor(severity) {
   const colors = {
-    critical: '#ef4444',
-    major: '#f97316', 
-    minor: '#eab308',
-    info: '#3b82f6'
+    critical: '#ef4444',  // Red
+    major: '#f97316',     // Orange  
+    minor: '#eab308',     // Yellow
+    unknown: '#6b7280'    // Gray
   };
-  return colors[severity.toLowerCase()] || '#3b82f6';
+  return colors[severity.toLowerCase()] || '#6b7280';
 }
 
 module.exports = router;

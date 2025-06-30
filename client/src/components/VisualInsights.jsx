@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, Filter, TrendingUp, PieChart, BarChart3, FileText, Download, Bug, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell, BarChart, Bar, Area, AreaChart } from 'recharts';
@@ -11,8 +12,7 @@ const VisualInsightsPage = () => {
   const [languageFilter, setLanguageFilter] = useState('all');
   const [error, setError] = useState(null);
 
-  // Real data states
-  const [rawScans, setRawScans] = useState([]); // Store all raw scan data
+  // Data states
   const [timelineData, setTimelineData] = useState([]);
   const [severityDistribution, setSeverityDistribution] = useState([]);
   const [repoData, setRepoData] = useState([]);
@@ -23,7 +23,6 @@ const VisualInsightsPage = () => {
   const [totalRepos, setTotalRepos] = useState(0);
   const [avgBugsPerScan, setAvgBugsPerScan] = useState(0);
   const [totalScans, setTotalScans] = useState(0);
-  const [rawBugs, setRawBugs] = useState([]); // Store all raw bug data
 
   // Footer Component
   const Footer = () => {
@@ -39,17 +38,20 @@ const VisualInsightsPage = () => {
     );
   };
 
-  const [user, setUser] = useState(() => {
+  // User state using in-memory storage instead of localStorage
+  const [user, setUser] = useState({ name: 'User', email: 'user@example.com' });
+
+  // Initialize user data from localStorage on component mount
+  useEffect(() => {
     const userData = localStorage.getItem('userData');
     if (userData) {
       try {
-        return JSON.parse(userData);
+        setUser(JSON.parse(userData));
       } catch (error) {
         console.error('Error parsing user data:', error);
       }
     }
-    return { name: 'User', email: 'user@example.com' };
-  });
+  }, []);
 
   // Utility function to get auth token
   const getAuthToken = () => {
@@ -64,7 +66,7 @@ const VisualInsightsPage = () => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        ...options.headers,
+        ...options.headers
       },
     });
 
@@ -75,145 +77,18 @@ const VisualInsightsPage = () => {
     return response.json();
   };
 
-  // Fetch all scan data
-  const fetchScanData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch scan history with a large limit to get all data
-      const historyResponse = await apiCall('/api/scan/history?limit=1000&sortBy=createdAt&sortOrder=asc');
-      
-      if (!historyResponse.success) {
-        throw new Error('Failed to fetch scan history');
-      }
-
-      const scans = historyResponse.data.filter(scan => scan.status === 'completed');
-      
-      // Process timeline data
-      processTimelineData(scans);
-      
-      // Process severity distribution
-      processSeverityDistribution(scans);
-      
-      // Process repository data
-      processRepositoryData(scans);
-      
-      // Process file data (this will be estimated since we don't have individual file data)
-      processFileData(scans);
-      
-      // Update repositories list
-      updateRepositoriesList(scans);
-      
-      // Calculate summary metrics
-      calculateSummaryMetrics(scans);
-
-    } catch (err) {
-      console.error('Error fetching scan data:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+  // Helper function to convert date range to days
+  const getDateRangeDays = (range) => {
+    switch (range) {
+      case '7days': return 7;
+      case '30days': return 30;
+      case '90days': return 90;
+      case '1year': return 365;
+      default: return 30;
     }
   };
 
-  // Process severity distribution for pie chart
-  const processSeverityDistribution = (scans) => {
-    let totalBugs = 0;
-    scans.forEach(scan => {
-      totalBugs += scan.totalBugs || 0;
-    });
-
-    // Estimate severity distribution based on common patterns
-    const estimatedCritical = Math.floor(totalBugs * 0.2);
-    const estimatedMajor = Math.floor(totalBugs * 0.5);
-    const estimatedMinor = totalBugs - estimatedCritical - estimatedMajor;
-
-    setSeverityDistribution([
-      { name: 'Critical', value: estimatedCritical, color: '#ef4444' },
-      { name: 'Major', value: estimatedMajor, color: '#f97316' },
-      { name: 'Minor', value: estimatedMinor, color: '#eab308' }
-    ]);
-  };
-
-  // Process repository data for bar chart
-  const processRepositoryData = (scans) => {
-    const repoMap = {};
-    
-    scans.forEach(scan => {
-      const repoName = scan.repoName || 'Unknown';
-      if (!repoMap[repoName]) {
-        repoMap[repoName] = { name: repoName, bugs: 0, critical: 0, major: 0, minor: 0 };
-      }
-      
-      const totalBugs = scan.totalBugs || 0;
-      repoMap[repoName].bugs += totalBugs;
-      
-      // Estimate severity distribution
-      const estimatedCritical = Math.floor(totalBugs * 0.2);
-      const estimatedMajor = Math.floor(totalBugs * 0.5);
-      const estimatedMinor = totalBugs - estimatedCritical - estimatedMajor;
-      
-      repoMap[repoName].critical += estimatedCritical;
-      repoMap[repoName].major += estimatedMajor;
-      repoMap[repoName].minor += estimatedMinor;
-    });
-    
-    const repoArray = Object.values(repoMap)
-      .sort((a, b) => b.bugs - a.bugs)
-      .slice(0, 10); // Top 10 repositories
-      
-    setRepoData(repoArray);
-  };
-
-  // Process file data (estimated since we don't have individual file data)
-  const processFileData = (scans) => {
-    // Generate estimated file data based on common file patterns
-    const commonFiles = [
-      '/src/components/Login.jsx',
-      '/utils/payment-processor.js',
-      '/src/components/Dashboard.jsx',
-      '/utils/validation.js',
-      '/src/api/user-service.js',
-      '/components/ProductList.jsx',
-      '/utils/database-helper.js'
-    ];
-    
-    const totalBugs = scans.reduce((sum, scan) => sum + (scan.totalBugs || 0), 0);
-    
-    const estimatedFileData = commonFiles.map((file, index) => ({
-      file,
-      bugs: Math.floor((totalBugs / commonFiles.length) * (1 - index * 0.1))
-    }));
-    
-    setFileData(estimatedFileData);
-  };
-
-  // Update repositories list
-  const updateRepositoriesList = (scans) => {
-    const uniqueRepos = ['all', ...new Set(scans.map(scan => scan.repoName).filter(Boolean))];
-    setRepositories(uniqueRepos);
-  };
-
-  // Calculate summary metrics
-  const calculateSummaryMetrics = (scans) => {
-    const totalBugsCount = scans.reduce((sum, scan) => sum + (scan.totalBugs || 0), 0);
-    const uniqueRepos = new Set(scans.map(scan => scan.repoName).filter(Boolean));
-    const avgBugs = scans.length > 0 ? (totalBugsCount / scans.length).toFixed(1) : '0.0';
-    
-    setTotalBugs(totalBugsCount);
-    setTotalRepos(uniqueRepos.size);
-    setAvgBugsPerScan(avgBugs);
-  };
-
-  // Filter data based on current filters
-  const getFilteredData = (data, filterKey = 'name') => {
-    if (selectedRepo === 'all') return data;
-    return data.filter(item => item[filterKey] === selectedRepo);
-  };
-
-
-
-  // Fetch data using your actual API endpoints
+  // Fetch analytics data using the new API endpoint
   const fetchAnalyticsData = async () => {
     try {
       setIsLoading(true);
@@ -221,15 +96,15 @@ const VisualInsightsPage = () => {
 
       // Build query parameters
       const params = new URLSearchParams({
-        dateRange: dateRange,
-        severity: severityFilter,
-        repository: selectedRepo,
-        language: languageFilter
+        dateRange: getDateRangeDays(dateRange).toString(),
+        ...(severityFilter !== 'all' && { severity: severityFilter }),
+        ...(selectedRepo !== 'all' && { repository: selectedRepo }),
+        ...(languageFilter !== 'all' && { language: languageFilter })
       });
 
-      // Use your actual analytics overview endpoint
+      // Use the new analytics overview endpoint
       const response = await apiCall(`/api/scan/analytics/overview?${params}`);
-      
+
       if (!response.success) {
         throw new Error('Failed to fetch analytics data');
       }
@@ -242,15 +117,15 @@ const VisualInsightsPage = () => {
       setAvgBugsPerScan(data.summary.avgBugsPerScan);
       setTotalScans(data.summary.totalScans);
 
-      // Set chart data
-      setSeverityDistribution(data.severityDistribution);
-      setTimelineData(data.timeline);
-      setRepoData(data.topRepositories);
-      setFileData(data.topFiles);
+      // Set chart data - Fix severity distribution mapping
+      setSeverityDistribution(data.severityDistribution || []);
+      setTimelineData(data.timeline || []);
+      setRepoData(data.topRepositories || []);
+      setFileData(data.topFiles || []);
 
       // Set filter options
-      setRepositories(data.filters.repositories);
-      setLanguages(data.filters.languages);
+      setRepositories(data.filters.repositories || ['all']);
+      setLanguages(data.filters.languages || ['all']);
 
     } catch (err) {
       console.error('Error fetching analytics data:', err);
@@ -278,6 +153,35 @@ const VisualInsightsPage = () => {
     window.location.href = '/';
   };
 
+  const handleExportCSV = () => {
+    // Create CSV data
+    const csvData = [
+      ['Repository', 'Total Bugs', 'Critical', 'Major', 'Minor', 'Unknwon'],
+      ...repoData.map(repo => [
+        repo.name,
+        repo.bugs,
+        repo.critical || 0,
+        repo.major || 0,
+        repo.minor || 0,
+        repo.unknown || 0
+      ])
+    ];
+
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bugwise-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    // Basic PDF export functionality
+    alert('PDF export functionality would be implemented here with a PDF library like jsPDF');
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-n-8 flex items-center justify-center">
@@ -285,7 +189,7 @@ const VisualInsightsPage = () => {
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-red-400 text-lg mb-2">Error loading data</p>
           <p className="text-n-3 mb-4">{error}</p>
-          <button 
+          <button
             onClick={fetchAnalyticsData}
             className="px-6 py-2 bg-color-1 text-white rounded-xl hover:bg-color-1/80 transition-colors"
           >
@@ -435,7 +339,6 @@ const VisualInsightsPage = () => {
                   <option value="critical">Critical</option>
                   <option value="major">Major</option>
                   <option value="minor">Minor</option>
-                  <option value="info">Info</option>
                 </select>
               </div>
 
@@ -489,23 +392,23 @@ const VisualInsightsPage = () => {
                   <AreaChart data={timelineData}>
                     <defs>
                       <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorCritical" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#9CA3AF" 
+                    <XAxis
+                      dataKey="date"
+                      stroke="#9CA3AF"
                       fontSize={12}
                       tickFormatter={(value) => new Date(value).toLocaleDateString()}
                     />
                     <YAxis stroke="#9CA3AF" fontSize={12} />
-                    <Tooltip 
+                    <Tooltip
                       contentStyle={{
                         backgroundColor: 'rgba(17, 24, 39, 0.95)',
                         border: '1px solid rgba(75, 85, 99, 0.3)',
@@ -598,15 +501,15 @@ const VisualInsightsPage = () => {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                       <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        stroke="#9CA3AF" 
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        stroke="#9CA3AF"
                         fontSize={10}
                         width={100}
                         tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
                       />
-                      <Tooltip 
+                      <Tooltip
                         contentStyle={{
                           backgroundColor: 'rgba(17, 24, 39, 0.95)',
                           border: '1px solid rgba(75, 85, 99, 0.3)',
@@ -617,8 +520,8 @@ const VisualInsightsPage = () => {
                         formatter={(value, name) => [value, 'Bugs']}
                         labelFormatter={(label) => `Repository: ${label}`}
                       />
-                      <Bar 
-                        dataKey="bugs" 
+                      <Bar
+                        dataKey="bugs"
                         fill="url(#barGradient)"
                         radius={[0, 4, 4, 0]}
                       />
@@ -628,7 +531,7 @@ const VisualInsightsPage = () => {
               </div>
             </div>
 
-            {/* Stacked Area Chart - Bug Severity per Repo */}
+            {/* Stacked Bar Chart - Bug Severity per Repo */}
             <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
               <h3 className="text-xl font-bold text-n-1 mb-6 flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-color-1" />
@@ -655,9 +558,9 @@ const VisualInsightsPage = () => {
                       backdropFilter: 'blur(10px)'
                     }}
                   />
-                  <Bar dataKey="criticalBugs" stackId="a" fill="#ef4444" name="Critical" />
-                  <Bar dataKey="majorBugs" stackId="a" fill="#f97316" name="Major" />
-                  <Bar dataKey="minorBugs" stackId="a" fill="#eab308" name="Minor" />
+                  <Bar dataKey="critical" stackId="a" fill="#ef4444" name="Critical" />
+                  <Bar dataKey="major" stackId="a" fill="#f97316" name="Major" />
+                  <Bar dataKey="minor" stackId="a" fill="#eab308" name="Minor" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -670,10 +573,16 @@ const VisualInsightsPage = () => {
                   <h3 className="text-lg font-semibold text-white">Export Data</h3>
                 </div>
                 <div className="flex gap-3">
-                  <button className="px-4 py-2 bg-gradient-to-r from-color-1 to-purple-500 text-white rounded-xl hover:from-color-1/80 hover:to-purple-500/80 transition-all duration-200 font-medium">
+                  <button
+                    onClick={handleExportCSV}
+                    className="px-4 py-2 bg-gradient-to-r from-color-1 to-purple-500 text-white rounded-xl hover:from-color-1/80 hover:to-purple-500/80 transition-all duration-200 font-medium"
+                  >
                     Export CSV
                   </button>
-                  <button className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-500/80 hover:to-emerald-500/80 transition-all duration-200 font-medium">
+                  <button
+                    onClick={handleExportPDF}
+                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-500/80 hover:to-emerald-500/80 transition-all duration-200 font-medium"
+                  >
                     Export PDF
                   </button>
                 </div>
@@ -682,7 +591,7 @@ const VisualInsightsPage = () => {
                 Export your visual insights data for further analysis or reporting.
               </p>
             </div>
-          </div>  
+          </div>
         </div>
       </div>
       <Footer />
