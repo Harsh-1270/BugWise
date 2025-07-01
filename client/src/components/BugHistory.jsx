@@ -799,7 +799,7 @@ const Footer = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => window.open('/docs', '_blank')}
+                onClick={() => window.open('/docspage', '_blank')}
                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl transition-all duration-300"
               >
                 <FileText className="w-4 h-4" />
