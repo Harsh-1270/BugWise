@@ -29,7 +29,7 @@ const BUG_PATTERNS = {
       /\$_GET\[.*\].*query/gi,
       /\$_POST\[.*\].*query/gi
     ],
-    severity: 'Major',
+    severity: 'major',
     category: 'Security'
   },
   'xss-vulnerability': {
@@ -39,7 +39,7 @@ const BUG_PATTERNS = {
       /eval\s*\(/gi,
       /dangerouslySetInnerHTML/gi
     ],
-    severity: 'Critical',
+    severity: 'critical',
     category: 'Security'
   },
   'buffer-overflow': {
@@ -49,7 +49,7 @@ const BUG_PATTERNS = {
       /sprintf\s*\(/gi,
       /gets\s*\(/gi
     ],
-    severity: 'Critical',
+    severity: 'critical',
     category: 'Security'
   },
   'memory-leak': {
@@ -58,7 +58,7 @@ const BUG_PATTERNS = {
       /new\s+\w+.*(?!delete)/gi,
       /calloc\s*\(.*\).*(?!free)/gi
     ],
-    severity: 'Minor',
+    severity: 'minor',
     category: 'Memory Management'
   },
   'null-pointer': {
@@ -67,7 +67,7 @@ const BUG_PATTERNS = {
       /\w+\.\w+\s*(?!\s*!=\s*null)/gi,
       /\[\w+\]\s*(?!\s*!=\s*null)/gi
     ],
-    severity: 'Major',
+    severity: 'major',
     category: 'Runtime Error'
   },
   'hardcoded-secrets': {
@@ -77,7 +77,7 @@ const BUG_PATTERNS = {
       /secret\s*=\s*['"]\w+['"]/gi,
       /token\s*=\s*['"]\w+['"]/gi
     ],
-    severity: 'Critical',
+    severity: 'critical',
     category: 'Security'
   },
   'insecure-random': {
@@ -86,7 +86,7 @@ const BUG_PATTERNS = {
       /rand\(\)/gi,
       /Random\(\)/gi
     ],
-    severity: 'Minor',
+    severity: 'minor',
     category: 'Security'
   },
   'race-condition': {
@@ -95,7 +95,7 @@ const BUG_PATTERNS = {
       /thread.*start.*(?!join)/gi,
       /async.*(?!await)/gi
     ],
-    severity: 'Minor',
+    severity: 'minor',
     category: 'Concurrency'
   }
 };
@@ -117,15 +117,15 @@ class AICodeAnalyzer {
 // Add this method to AICodeAnalyzer class
 normalizeSeverity(severity) {
   const severityMap = {
-    'critical': 'Critical',
-    'high': 'Major', 
-    'medium': 'Minor',
-    'low': 'Minor',
-    'unknown': 'Unknown'
+    'critical': 'critical',
+    'high': 'major', 
+    'medium': 'minor',
+    'low': 'minor',
+    'unknown': 'unknown'
   };
   
   const normalized = severity.toLowerCase();
-  return severityMap[normalized] || 'Unknown';
+  return severityMap[normalized] || 'unknown';
 }
   async ensureTempDir() {
     try {
@@ -566,10 +566,10 @@ async function startScan(scanId) {
     // Defensive check and transformation for severity summary
     const severity = results.summary || {};
     const severityCounts = {
-      Critical: severity.Critical || 0,
-      Major: severity.Major || 0,
-      Minor: severity.Minor || 0,
-      Unknown: severity.Unknown || 0,
+      Critical: severity.critical || 0,
+      Major: severity.major || 0,
+      Minor: severity.minor || 0,
+      Unknown: severity.unknown || 0,
       total: severity.total || 0,
     };
 
@@ -587,7 +587,7 @@ async function startScan(scanId) {
       }
 
       // Validate severity value enum
-      const validSeverities = ['Critical', 'Major', 'Minor', 'Unknown'];
+      const validSeverities = ['critical', 'major', 'minor', 'unknown'];
       if (!validSeverities.includes(bug.severity)) {
         throw new Error(`Invalid severity value: ${bug.severity}`);
       }

@@ -23,6 +23,20 @@ const VisualInsightsPage = () => {
   const [totalRepos, setTotalRepos] = useState(0);
   const [avgBugsPerScan, setAvgBugsPerScan] = useState(0);
   const [totalScans, setTotalScans] = useState(0);
+    const [scanHistory, setScanHistory] = useState([]);
+    const [dashboardData, setDashboardData] = useState({
+    overview: {
+      totalScans: 0,
+      completedScans: 0,
+      failedScans: 0,
+      successRate: 0,
+      totalBugsFound: 0,
+      totalFilesScanned: 0,
+      avgScanTime: 0
+    },
+    recentActivity: [],
+    bugDistribution: {}
+  });
 
   // Footer Component
   const Footer = () => {
@@ -110,7 +124,10 @@ const VisualInsightsPage = () => {
       }
 
       const data = response.data;
-
+await Promise.all([
+        fetchDashboardData(),
+        fetchScanHistory()
+      ]);
       // Set summary metrics
       setTotalBugs(data.summary.totalBugs);
       setTotalRepos(data.summary.totalRepos);
@@ -134,6 +151,115 @@ const VisualInsightsPage = () => {
       setIsLoading(false);
     }
   };
+
+    // Process scan history into timeline data
+  const processTimelineData = (scans) => {
+    const timelineMap = new Map();
+    
+    scans.forEach(scan => {
+      const date = new Date(scan.createdAt).toISOString().split('T')[0];
+      
+      if (!timelineMap.has(date)) {
+        timelineMap.set(date, {
+          date,
+          total: 0,
+          critical: 0,
+          completed: 0,
+          failed: 0
+        });
+      }
+      
+      const dayData = timelineMap.get(date);
+      dayData.total += 1;
+      dayData[scan.status] = (dayData[scan.status] || 0) + 1;
+      
+      if (scan.totalBugs) {
+        dayData.bugs = (dayData.bugs || 0) + scan.totalBugs;
+      }
+    });
+
+    return Array.from(timelineMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  // Process bug distribution data
+  const processBugDistribution = (bugDistribution) => {
+    const colors = {
+      critical: '#ef4444',
+      major: '#f97316', 
+      minor: '#eab308',
+      unknown: '#6b7280'
+    };
+
+    return Object.entries(bugDistribution).map(([severity, count]) => ({
+      name: severity.charAt(0).toUpperCase() + severity.slice(1),
+      value: count,
+      color: colors[severity] || colors.unknown
+    }));
+  };
+
+   // Fetch dashboard statistics
+  const fetchDashboardData = async () => {
+    try {
+      const response = await apiCall(`/api/scan/stats/dashboard?timeRange=${dateRange}`);
+      
+      if (response.success) {
+        setDashboardData(response.data);
+      } else {
+        throw new Error('Failed to fetch dashboard data');
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      throw err;
+    }
+  };
+
+  // Fetch scan history for timeline
+  const fetchScanHistory = async () => {
+    try {
+      const response = await apiCall(`/api/scan/history?limit=50&sortBy=createdAt&sortOrder=desc`);
+      
+      if (response.success) {
+        setScanHistory(response.data);
+        
+        // Filter by date range and severity
+        let filteredScans = response.data;
+        
+        if (dateRange !== 'all') {
+          const days = parseInt(dateRange.replace('d', ''));
+          const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+          filteredScans = filteredScans.filter(scan => new Date(scan.createdAt) >= cutoffDate);
+        }
+        
+        setTimelineData(processTimelineData(filteredScans));
+      } else {
+        throw new Error('Failed to fetch scan history');
+      }
+    } catch (err) {
+      console.error('Error fetching scan history:', err);
+      throw err;
+    }
+  };
+
+  // Main data fetching function
+  const fetchAllData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Fetch data in parallel for better performance
+      await Promise.all([
+        fetchDashboardData(),
+        fetchScanHistory()
+      ]);
+
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // Re-fetch data when filters change
   useEffect(() => {
@@ -177,10 +303,35 @@ const VisualInsightsPage = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = () => {
-    // Basic PDF export functionality
-    alert('PDF export functionality would be implemented here with a PDF library like jsPDF');
-  };
+const handleExportPDF = () => {
+  import('jspdf').then(jsPDFModule => {
+    import('jspdf-autotable').then(() => {
+      const doc = new jsPDFModule.jsPDF();
+      doc.setFontSize(18);
+      doc.text('BugWise - Visual Insights Report', 14, 22);
+
+      const headers = [['Repository', 'Total Bugs', 'Critical', 'Major', 'Minor', 'Unknown']];
+      const rows = repoData.map(repo => [
+        repo.name,
+        repo.bugs,
+        repo.critical || 0,
+        repo.major || 0,
+        repo.minor || 0,
+        repo.unknown || 0
+      ]);
+
+      doc.autoTable({
+        startY: 30,
+        head: headers,
+        body: rows,
+        styles: { fontSize: 10 }
+      });
+
+      doc.save(`bugwise-analytics-${new Date().toISOString().split('T')[0]}.pdf`);
+    });
+  });
+};
+
 
   if (error) {
     return (
@@ -210,6 +361,8 @@ const VisualInsightsPage = () => {
       </div>
     );
   }
+
+  const bugDistributionData = processBugDistribution(dashboardData.bugDistribution);
 
   return (
     <div className="min-h-screen bg-n-8 relative overflow-hidden">
@@ -483,50 +636,45 @@ const VisualInsightsPage = () => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Bar Chart - Top Repositories */}
+               {/* Recent Activity */}
               <div className="bg-gradient-to-br from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-5 h-5 text-color-1" />
-                  <h3 className="text-lg font-semibold text-white">Top Buggy Repositories</h3>
+                  <Clock className="w-5 h-5 text-color-1" />
+                  <h3 className="text-lg font-semibold text-white">Recent Scan Activity</h3>
                 </div>
 
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={repoData} layout="horizontal">
-                      <defs>
-                        <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#8B5CF6" />
-                          <stop offset="100%" stopColor="#3B82F6" />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                      <XAxis type="number" stroke="#9CA3AF" fontSize={12} />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        stroke="#9CA3AF"
-                        fontSize={10}
-                        width={100}
-                        tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                          border: '1px solid rgba(75, 85, 99, 0.3)',
-                          borderRadius: '12px',
-                          color: '#F3F4F6',
-                          backdropFilter: 'blur(10px)'
-                        }}
-                        formatter={(value, name) => [value, 'Bugs']}
-                        labelFormatter={(label) => `Repository: ${label}`}
-                      />
-                      <Bar
-                        dataKey="bugs"
-                        fill="url(#barGradient)"
-                        radius={[0, 4, 4, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {dashboardData.recentActivity.length > 0 ? (
+                    dashboardData.recentActivity.map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            activity.status === 'completed' ? 'bg-green-400' : 
+                            activity.status === 'failed' ? 'bg-red-400' : 'bg-yellow-400'
+                          }`}></div>
+                          <div>
+                            <p className="text-white font-medium">{activity.repoName}</p>
+                            <p className="text-n-3 text-sm">
+                              {new Date(activity.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-n-1 font-medium">{activity.bugsFound} bugs</p>
+                          <p className={`text-sm capitalize ${
+                            activity.status === 'completed' ? 'text-green-400' : 
+                            activity.status === 'failed' ? 'text-red-400' : 'text-yellow-400'
+                          }`}>
+                            {activity.status}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-n-3">No recent activity found</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

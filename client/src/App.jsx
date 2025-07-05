@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google'; // Add this import
 import ButtonGradient from "./assets/svg/ButtonGradient";
 import Benefits from "./components/Benefits";
 import Collaboration from "./components/Collaboration";
@@ -82,10 +83,12 @@ const App = () => {
     localStorage.removeItem('userData');
   };
 
-  if (isLoggedIn) {
-    return (
-      <>
-        <Toaster position='bottom-right' toastOptions={{duration:2000}} />
+  // Wrap all content with GoogleOAuthProvider
+  return (
+    <GoogleOAuthProvider clientId="1066437553206-b3uhlngbu5a2g8sai94t62km25h33j76.apps.googleusercontent.com">
+      <Toaster position='bottom-right' toastOptions={{duration:2000}} />
+      
+      {isLoggedIn ? (
         <Routes>
           <Route path="/dashboard" element={<Dashboard user={user} onLogout={handleLogout} />} />
           <Route path="/detect-bugs" element={<DetectBugsPage user={user} />} />
@@ -95,77 +98,58 @@ const App = () => {
           <Route path="/docspage" element={<DocsPage user={user}/> }/>
           <Route path="*" element={<Navigate to="/dashboard" />}/>
         </Routes>
-      </>
-    );
-  }
-
-  // Render auth forms based on state
-  if (authForm === 'signin') {
-    return (
-      <>
-        <Toaster position='bottom-right' toastOptions={{duration:2000}} />
+      ) : authForm === 'signin' ? (
         <SignInForm 
           onClose={handleCloseAuth}
           onSwitchToSignUp={handleSwitchToSignUp}
           onLoginSuccess={(userData) => handleLoginSuccess(userData, 'login')}
         />
-      </>
-    );
-  }
-
-  if (authForm === 'signup') {
-    return (
-      <>
-        <Toaster position='bottom-right' toastOptions={{duration:2000}} />
+      ) : authForm === 'signup' ? (
         <SignUpForm 
           onClose={handleCloseAuth}
           onSwitchToSignIn={handleSwitchToSignIn}
           onSignUpSuccess={(userData) => handleLoginSuccess(userData, 'register')}
         />
-      </>
-    );
-  }
-
-  // Main landing page
-  return (
-    <>
-      <div className="pt-[4.75rem] lg:pt-[5.25rem] overflow-hidden">
-        <Header 
-          onSignInClick={handleShowSignIn}
-          onSignUpClick={handleShowSignUp}
-        />
-        <Hero 
-          onSignInClick={handleShowSignIn}
-          onSignUpClick={handleShowSignUp}
-        />
-        <Toaster position='bottom-right' toastOptions={{duration:2000}} />
-        <Routes>
-          <Route path='/signup' element={
-            <SignUpForm 
-              onSignUpSuccess={(userData) => handleLoginSuccess(userData, 'register')}
-              onSwitchToSignIn={handleShowSignIn}
-              onClose={() => {}} 
+      ) : (
+        <>
+          <div className="pt-[4.75rem] lg:pt-[5.25rem] overflow-hidden">
+            <Header 
+              onSignInClick={handleShowSignIn}
+              onSignUpClick={handleShowSignUp}
             />
-          } />
-          <Route path='/signin' element={
-            <SignInForm 
-              onLoginSuccess={(userData) => handleLoginSuccess(userData, 'login')}
-              onSwitchToSignUp={handleShowSignUp}
-              onClose={() => {}} 
+            <Hero 
+              onSignInClick={handleShowSignIn}
+              onSignUpClick={handleShowSignUp}
             />
-          } />
-          
-          <Route path="/profile" element={<ProfilePage />} />
-        </Routes>
-        <Benefits />
-        <Collaboration />
-        <Services />
-        <Pricing />
-        <Roadmap />
-        <Footer />
-      </div>
-      <ButtonGradient />
-    </>
+            <Routes>
+              <Route path='/signup' element={
+                <SignUpForm 
+                  onSignUpSuccess={(userData) => handleLoginSuccess(userData, 'register')}
+                  onSwitchToSignIn={handleShowSignIn}
+                  onClose={() => {}} 
+                />
+              } />
+              <Route path='/signin' element={
+                <SignInForm 
+                  onLoginSuccess={(userData) => handleLoginSuccess(userData, 'login')}
+                  onSwitchToSignUp={handleShowSignUp}
+                  onClose={() => {}} 
+                />
+              } />
+              
+              <Route path="/profile" element={<ProfilePage />} />
+            </Routes>
+            <Benefits />
+            <Collaboration />
+            <Services />
+            <Pricing />
+            <Roadmap />
+            <Footer />
+          </div>
+          <ButtonGradient />
+        </>
+      )}
+    </GoogleOAuthProvider>
   );
 };
 

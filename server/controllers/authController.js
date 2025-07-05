@@ -96,44 +96,67 @@ const loginUser = async (req, res) => {
     res.status(500).json({ error: 'Server error during login' });
   }
 };
-
-// Google OAuth Login/Signup
+// Google OAuth Login/Signup - Updated to handle user data from frontend
 const googleAuth = async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { googleId, name, email, picture, access_token } = req.body;
 
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    console.log('Received Google auth data:', { googleId, name, email, picture }); // Debug log
 
-    const payload = ticket.getPayload();
-    const { email, name, picture, sub: googleId } = payload;
+    // Validate required fields
+    if (!googleId || !name || !email) {
+      return res.status(400).json({ error: 'Missing required Google user data' });
+    }
 
+    // Check if user exists by email or googleId
     let user = await User.findOne({
       $or: [{ email }, { googleId }],
     });
 
     if (!user) {
-      // New Google user
+      // Create new Google user
       user = await User.create({
         name,
         email,
         googleId,
         profilePicture: picture,
         isGoogleUser: true,
+        // Note: No password field for Google users
       });
-    } else if (!user.googleId) {
-      user.googleId = googleId;
-      await user.save();
+      console.log('Created new Google user:', user._id);
+    } else {
+      // Update existing user with Google data if needed
+      let updateNeeded = false;
+      
+      if (!user.googleId) {
+        user.googleId = googleId;
+        updateNeeded = true;
+      }
+      
+      if (!user.profilePicture && picture) {
+        user.profilePicture = picture;
+        updateNeeded = true;
+      }
+      
+      if (!user.isGoogleUser) {
+        user.isGoogleUser = true;
+        updateNeeded = true;
+      }
+      
+      if (updateNeeded) {
+        await user.save();
+        console.log('Updated existing user with Google data:', user._id);
+      }
     }
 
+    // Generate JWT token
     const token = jwt.sign(
       { email: user.email, id: user._id, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
+    // Set cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -149,12 +172,12 @@ const googleAuth = async (req, res) => {
         picture: user.profilePicture,
       },
       token,
-      message: 'Login successful',
+      message: 'Google authentication successful',
     });
 
   } catch (error) {
     console.error('Google Auth Error:', error);
-    res.status(400).json({ error: 'Google authentication failed' });
+    res.status(500).json({ error: 'Google authentication failed' });
   }
 };
 

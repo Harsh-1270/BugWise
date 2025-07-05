@@ -75,12 +75,13 @@ import instagram from "./socials/instagram.svg";
 import telegram from "./socials/telegram.svg";
 import twitter from "./socials/twitter.svg";
 
+export { default as brainwaveSymbol } from "./brainwave-symbol.svg";
 export {
   brainwave,
   check,
   check2,
   loading1,
-  brainwaveSymbol,
+  // brainwaveSymbol,
   brainwaveWhiteSymbol,
   play,
   gradient,

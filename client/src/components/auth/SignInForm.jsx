@@ -2,6 +2,8 @@ import { useState } from "react"
 import axios from 'axios'
 import { toast } from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import brainwaveSymbol from "../../assets/brainwave-symbol.svg";
+
 
 export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }) {
   const navigate = useNavigate()
@@ -11,47 +13,47 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
     password: '',
   })
 
- const loginUser = async (e) => {
-  e.preventDefault();
-  const { email, password } = data;
-  try {
-    const { data: responseData } = await axios.post('/signinform', {
-      email,
-      password,
-    });
-
-    if (responseData.error) {
-      toast.error(responseData.error);
-    } else {
-      // Store the token so it can be used in subsequent API calls
-      if (responseData.token) {
-        localStorage.setItem('authToken', responseData.token);
-      }
-
-      // Clear form data
-      setData({
-        email: '',
-        password: ''
+  const loginUser = async (e) => {
+    e.preventDefault();
+    const { email, password } = data;
+    try {
+      const { data: responseData } = await axios.post('/signinform', {
+        email,
+        password,
       });
 
-      const userData = {
-        name: responseData.name || responseData.user?.name || email.split('@')[0],
-        email: responseData.email || email,
-        token: responseData.token || 'logged-in',
-        id: responseData.id || responseData.user?.id
-      };
-
-      if (onLoginSuccess) {
-        onLoginSuccess(userData);
+      if (responseData.error) {
+        toast.error(responseData.error);
       } else {
-        navigate('/');
+        // Store the token so it can be used in subsequent API calls
+        if (responseData.token) {
+          localStorage.setItem('authToken', responseData.token);
+        }
+
+        // Clear form data
+        setData({
+          email: '',
+          password: ''
+        });
+
+        const userData = {
+          name: responseData.name || responseData.user?.name || email.split('@')[0],
+          email: responseData.email || email,
+          token: responseData.token || 'logged-in',
+          id: responseData.id || responseData.user?.id
+        };
+
+        if (onLoginSuccess) {
+          onLoginSuccess(userData);
+        } else {
+          navigate('/');
+        }
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Login failed. Please try again.');
     }
-  } catch (error) {
-    console.error('Login error:', error);
-    toast.error('Login failed. Please try again.');
-  }
-};
+  };
 
   const handleGoogleSignIn = () => {
     // Add your Google OAuth logic here
@@ -60,7 +62,7 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
 
   const handleSignUpClick = (e) => {
     e.preventDefault(); // Prevent default form submission or link behavior
-    
+
     if (onSwitchToSignUp) {
       onSwitchToSignUp();
     } else {
@@ -87,14 +89,26 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
         <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800/50 rounded-2xl p-6 shadow-2xl shadow-purple-500/10 ring-1 ring-purple-500/10">
           <div className="text-center mb-6">
             {/* Logo */}
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-red-500 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">B</span>
-              </div>
+            <div className="flex items-center justify-center mb-2">
+              <a
+                className="block transition-all duration-300 hover:scale-110"
+              >
+                <img
+                  src={brainwaveSymbol}
+                  width={50}
+                  height={10}
+                  alt="BugWise"
+                  className="drop-shadow-2xl filter brightness-110 hover:brightness-125 transition-all duration-300"
+                  style={{
+                    filter: 'drop-shadow(0 0 20px rgba(147, 51, 234, 0.6)) drop-shadow(0 0 40px rgba(147, 51, 234, 0.3))',
+                  }}
+                />
+              </a>
             </div>
             <h1 className="text-2xl font-bold text-white mb-1">Log in to BugWise</h1>
-            <p className="text-gray-400 text-xs">Welcome back! Please sign in to continue</p>
+            <p className="text-gray-400 text-xs">Welcome back, Sign in to continue</p>
           </div>
+
 
           {/* Google Sign In Button */}
           <button
