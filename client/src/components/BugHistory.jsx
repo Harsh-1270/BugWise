@@ -258,10 +258,19 @@ const Footer = () => {
   };
 
   const handleView = (scan) => {
-    // Navigate to detect-bugs page with scan data
+  try {
+    // Store scan data in sessionStorage for reliable access
+    sessionStorage.setItem('selectedScanData', JSON.stringify(scan));
+    
+    // Navigate to detect-bugs page
+    window.location.href = '/detect-bugs';
+  } catch (error) {
+    console.error('Error storing scan data:', error);
+    // Fallback: try the original method
     const scanData = encodeURIComponent(JSON.stringify(scan));
     window.location.href = `/detect-bugs?scanData=${scanData}`;
-  };
+  }
+};
 
   const showConfirmDialog = (action, item) => {
     setConfirmAction({ action, item });

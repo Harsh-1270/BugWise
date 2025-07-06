@@ -2,12 +2,73 @@ import { useState } from "react"
 import axios from 'axios'
 import { toast } from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { useGoogleLogin } from '@react-oauth/google'
 import brainwaveSymbol from "../../assets/brainwave-symbol.svg";
 
+// Custom themed toast notifications
+const showThemedToast = {
+  success: (message) => {
+    toast.success(message, {
+      style: {
+        background: 'rgba(17, 24, 39, 0.95)', // gray-900 with opacity
+        color: '#ffffff',
+        border: '1px solid rgba(168, 85, 247, 0.3)', // purple-500 border
+        borderRadius: '12px',
+        backdropFilter: 'blur(16px)',
+        fontSize: '14px',
+        fontWeight: '500',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(168, 85, 247, 0.1)',
+      },
+      iconTheme: {
+        primary: '#10b981', // emerald-500
+        secondary: '#ffffff',
+      },
+      duration: 4000,
+    });
+  },
+  error: (message) => {
+    toast.error(message, {
+      style: {
+        background: 'rgba(17, 24, 39, 0.95)', // gray-900 with opacity
+        color: '#ffffff',
+        border: '1px solid rgba(239, 68, 68, 0.3)', // red-500 border
+        borderRadius: '12px',
+        backdropFilter: 'blur(16px)',
+        fontSize: '14px',
+        fontWeight: '500',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(239, 68, 68, 0.1)',
+      },
+      iconTheme: {
+        primary: '#ef4444', // red-500
+        secondary: '#ffffff',
+      },
+      duration: 4000,
+    });
+  },
+  loading: (message) => {
+    return toast.loading(message, {
+      style: {
+        background: 'rgba(17, 24, 39, 0.95)', // gray-900 with opacity
+        color: '#ffffff',
+        border: '1px solid rgba(168, 85, 247, 0.3)', // purple-500 border
+        borderRadius: '12px',
+        backdropFilter: 'blur(16px)',
+        fontSize: '14px',
+        fontWeight: '500',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(168, 85, 247, 0.1)',
+      },
+      iconTheme: {
+        primary: '#8b5cf6', // violet-500
+        secondary: '#ffffff',
+      },
+    });
+  }
+};
 
 export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }) {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [data, setData] = useState({
     email: '',
     password: '',
@@ -15,15 +76,34 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
 
   const loginUser = async (e) => {
     e.preventDefault();
+    
+    if (isLoading) return; // Prevent duplicate submissions
+    
     const { email, password } = data;
+
+    // Basic validation
+    if (!email.trim() || !password.trim()) {
+      showThemedToast.error('Please fill in all fields')
+      return
+    }
+
+    setIsLoading(true)
+    let loadingToast;
+    
     try {
+      loadingToast = showThemedToast.loading('Signing you in...')
+      
       const { data: responseData } = await axios.post('/signinform', {
         email,
         password,
       });
 
+      if (loadingToast) {
+        toast.dismiss(loadingToast)
+      }
+
       if (responseData.error) {
-        toast.error(responseData.error);
+        showThemedToast.error(responseData.error);
       } else {
         // Store the token so it can be used in subsequent API calls
         if (responseData.token) {
@@ -43,25 +123,134 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
           id: responseData.id || responseData.user?.id
         };
 
+        showThemedToast.success(`Welcome back ${userData.name}!`)
+
         if (onLoginSuccess) {
           onLoginSuccess(userData);
         } else {
-          navigate('/');
+          setTimeout(() => {
+            navigate('/');
+          }, 1500);
         }
       }
     } catch (error) {
+      if (loadingToast) {
+        toast.dismiss(loadingToast)
+      }
       console.error('Login error:', error);
-      toast.error('Login failed. Please try again.');
+      
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.message ||
+        'Login failed. Please try again.'
+      showThemedToast.error(errorMessage);
+    } finally {
+      setIsLoading(false)
     }
   };
 
-  const handleGoogleSignIn = () => {
-    // Add your Google OAuth logic here
-    console.log('Google Sign In clicked')
-  }
+  // Google Login implementation
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      if (isLoading) return; // Prevent duplicate calls
+      
+      let loadingToast;
+      
+      try {
+        loadingToast = showThemedToast.loading('Connecting to Google...')
+        
+        console.log('Google token response:', tokenResponse)
+        
+        // Check if we have an access token
+        if (!tokenResponse.access_token) {
+          throw new Error('No access token received from Google')
+        }
+
+        // Get user info using the access token
+        const userInfoResponse = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenResponse.access_token}`, {
+          headers: {
+            Authorization: `Bearer ${tokenResponse.access_token}`,
+          },
+        })
+
+        if (!userInfoResponse.ok) {
+          throw new Error('Failed to get user info from Google')
+        }
+
+        const userInfo = await userInfoResponse.json()
+        console.log('User info from Google:', userInfo)
+
+        // Validate that we have the required data
+        if (!userInfo.id || !userInfo.name || !userInfo.email) {
+          throw new Error('Incomplete user data received from Google')
+        }
+
+        // Send user info to your backend with the correct field mapping
+        const requestData = {
+          googleId: userInfo.id,           // Map userInfo.id to googleId
+          name: userInfo.name,
+          email: userInfo.email,
+          picture: userInfo.picture || '',  // Provide fallback for optional field
+          access_token: tokenResponse.access_token
+        }
+
+        console.log('Sending to backend:', requestData) // Debug log
+
+        const { data: responseData } = await axios.post('/google', requestData)
+
+        if (loadingToast) {
+          toast.dismiss(loadingToast)
+        }
+
+        if (responseData.error) {
+          showThemedToast.error(responseData.error)
+        } else {
+          const userData = {
+            name: responseData.user?.name || userInfo.name,
+            email: responseData.user?.email || userInfo.email,
+            token: responseData.token,
+            id: responseData.user?.id,
+            picture: responseData.user?.picture || userInfo.picture
+          }
+
+          showThemedToast.success(`Welcome back ${userData.name}!`)
+
+          if (onLoginSuccess) {
+            onLoginSuccess(userData)
+          } else {
+            setTimeout(() => {
+              navigate('/dashboard')
+            }, 1500)
+          }
+        }
+      } catch (error) {
+        if (loadingToast) {
+          toast.dismiss(loadingToast)
+        }
+        console.error('Google signin error:', error)
+        
+        // More detailed error handling
+        let errorMessage = 'Google signin failed. Please try again.'
+        
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message
+        } else if (error.message) {
+          errorMessage = error.message
+        }
+        
+        showThemedToast.error(errorMessage)
+      }
+    },
+    onError: (error) => {
+      console.error('Google OAuth Error:', error)
+      showThemedToast.error('Google authentication failed. Please try again.')
+    },
+    scope: 'email profile',
+  })
 
   const handleSignUpClick = (e) => {
-    e.preventDefault(); // Prevent default form submission or link behavior
+    e.preventDefault(); 
 
     if (onSwitchToSignUp) {
       onSwitchToSignUp();
@@ -109,11 +298,11 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
             <p className="text-gray-400 text-xs">Welcome back, Sign in to continue</p>
           </div>
 
-
           {/* Google Sign In Button */}
           <button
-            onClick={handleGoogleSignIn}
-            className="w-full bg-gray-800/80 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-red-600/20 text-white font-medium py-2.5 px-4 rounded-xl mb-4 flex items-center justify-center gap-3 transition-all duration-300 border border-gray-700/50 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/25 group"
+            onClick={() => googleLogin()}
+            disabled={isLoading}
+            className="w-full bg-gray-800/80 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-red-600/20 text-white font-medium py-2.5 px-4 rounded-xl mb-4 flex items-center justify-center gap-3 transition-all duration-300 border border-gray-700/50 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/25 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800/80"
           >
             <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -142,7 +331,8 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
                 placeholder='Email address'
                 value={data.email}
                 onChange={(e) => setData({ ...data, email: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-800/70 transition-all duration-300 text-sm"
+                disabled={isLoading}
+                className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-800/70 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -153,13 +343,15 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
                 placeholder='Password'
                 value={data.password}
                 onChange={(e) => setData({ ...data, password: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-800/70 transition-all duration-300 pr-10 text-sm"
+                disabled={isLoading}
+                className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-800/70 transition-all duration-300 pr-10 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors duration-300"
+                disabled={isLoading}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showPassword ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,9 +368,20 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
 
             <button
               type='submit'
-              className="w-full bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-700 hover:to-red-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/25 text-sm"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-700 hover:to-red-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/25 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center gap-2"
             >
-              Sign in
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </form>
 
@@ -188,7 +391,8 @@ export default function SignInForm({ onLoginSuccess, onSwitchToSignUp, onClose }
               Don't have an account?{' '}
               <button
                 onClick={handleSignUpClick}
-                className="text-purple-400 hover:text-purple-300 transition-colors duration-300 font-medium"
+                disabled={isLoading}
+                className="text-purple-400 hover:text-purple-300 transition-colors duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sign up →
               </button>

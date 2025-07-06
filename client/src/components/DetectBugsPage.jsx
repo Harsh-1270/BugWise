@@ -41,6 +41,33 @@ useEffect(() => {
   }
 }, []);
 
+// Add this in your detect-bugs page component
+useEffect(() => {
+  // Check for scan data from history page
+  const storedScanData = sessionStorage.getItem('selectedScanData');
+  if (storedScanData) {
+    try {
+      const scanData = JSON.parse(storedScanData);
+      // Clear the stored data after using it
+      sessionStorage.removeItem('selectedScanData');
+    } catch (error) {
+      console.error('Error parsing stored scan data:', error);
+    }
+  }
+  
+  // Also check URL parameters as fallback
+  const urlParams = new URLSearchParams(window.location.search);
+  const scanDataParam = urlParams.get('scanData');
+  if (scanDataParam && !storedScanData) {
+    try {
+      const scanData = JSON.parse(decodeURIComponent(scanDataParam));
+      // Use the scan data here
+    } catch (error) {
+      console.error('Error parsing URL scan data:', error);
+    }
+  }
+}, []);
+
   // Get user data from localStorage (no need to use localStorage in state)
   const [user] = useState(() => {
     const userData = localStorage.getItem('userData');
@@ -139,7 +166,7 @@ useEffect(() => {
 
     setIsScanning(true);
     setScanResults(null);
-    setCurrentScanFile('🔄 Initializing scan...');
+    setCurrentScanFile('Initializing scan...');
     setError('');
 
     try {
@@ -450,7 +477,7 @@ useEffect(() => {
                   <div className="flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4" />
                     {/* <span>{currentScanFile}</span> */}
-                      <span>Scanning: <span className="font-mono text-color-1">{currentScanFile}</span></span>
+                      <span><span className="font-mono text-color-1">{currentScanFile}</span></span>
                   </div>
                 </div>
               </div>

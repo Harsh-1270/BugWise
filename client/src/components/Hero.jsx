@@ -9,8 +9,9 @@ import Generating from "./Generating";
 import Notification from "./Notification";
 import CompanyLogos from "./CompanyLogos";
 
-const Hero = () => {
+const Hero = ({onSignInClick}) => {
   const parallaxRef = useRef(null);
+  
 
   return (
     <Section
@@ -38,7 +39,8 @@ const Hero = () => {
           <p className="body-1 max-w-3xl mx-auto mb-6 text-n-2 lg:mb-8">
             AI-Powered Bug Detection to Help You Code with Confidence - Faster, Smarter, and Error-Free.
           </p>
-          <Button href="/pricing" white>
+          <Button onClick={onSignInClick}
+          white>
             Get started
           </Button>
         </div>

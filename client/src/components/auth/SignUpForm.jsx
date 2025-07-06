@@ -75,6 +75,37 @@ export default function SignUpForm({ onSignUpSuccess, onSwitchToSignIn, onClose 
     password: ''
   })
 
+  // Password validation state
+  const [passwordValidation, setPasswordValidation] = useState({
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+    isLengthValid: false
+  })
+
+  // Check password validation
+  const checkPasswordValidation = (password) => {
+    const validation = {
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /\d/.test(password),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      isLengthValid: password.length >= 6
+    }
+    setPasswordValidation(validation)
+    return validation
+  }
+
+  // Check if password meets all requirements
+  const isPasswordValid = (validation) => {
+    return validation.hasUppercase && 
+           validation.hasLowercase && 
+           validation.hasNumber && 
+           validation.hasSpecialChar && 
+           validation.isLengthValid
+  }
+
   const registerUser = async (e) => {
     e.preventDefault()
     const { name, email, password } = data
@@ -85,8 +116,10 @@ export default function SignUpForm({ onSignUpSuccess, onSwitchToSignIn, onClose 
       return
     }
 
-    if (password.length < 6) {
-      showThemedToast.error('Password must be at least 6 characters long')
+    // Check password validation
+    const validation = checkPasswordValidation(password)
+    if (!isPasswordValid(validation)) {
+      showThemedToast.error('Password does not meet all requirements')
       return
     }
 
@@ -107,6 +140,13 @@ export default function SignUpForm({ onSignUpSuccess, onSwitchToSignIn, onClose 
       } else {
         // Success - clear form data
         setData({ name: '', email: '', password: '' })
+        setPasswordValidation({
+          hasUppercase: false,
+          hasLowercase: false,
+          hasNumber: false,
+          hasSpecialChar: false,
+          isLengthValid: false
+        })
 
         // Prepare user data for the parent component
         const userData = {
@@ -338,7 +378,10 @@ const googleLogin = useGoogleLogin({
                 type={showPassword ? "text" : "password"}
                 placeholder='Password'
                 value={data.password}
-                onChange={(e) => setData({ ...data, password: e.target.value })}
+                onChange={(e) => {
+                  setData({ ...data, password: e.target.value })
+                  checkPasswordValidation(e.target.value)
+                }}
                 disabled={isLoading}
                 className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-800/70 transition-all duration-300 pr-10 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 required
@@ -361,6 +404,75 @@ const googleLogin = useGoogleLogin({
                 )}
               </button>
             </div>
+
+            {/* Password Validation Indicators */}
+            {data.password && (
+              <div className="bg-gray-800/30 border border-gray-700/30 rounded-xl p-3 space-y-2">
+                <p className="text-xs text-gray-300 font-medium mb-2">Password Requirements:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className={`flex items-center gap-2 text-xs ${passwordValidation.isLengthValid ? 'text-green-400' : 'text-gray-400'}`}>
+                    {passwordValidation.isLengthValid ? (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span>6+ characters</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasUppercase ? 'text-green-400' : 'text-gray-400'}`}>
+                    {passwordValidation.hasUppercase ? (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span>Uppercase</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasLowercase ? 'text-green-400' : 'text-gray-400'}`}>
+                    {passwordValidation.hasLowercase ? (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span>Lowercase</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasNumber ? 'text-green-400' : 'text-gray-400'}`}>
+                    {passwordValidation.hasNumber ? (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span>Number</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasSpecialChar ? 'text-green-400' : 'text-gray-400'} col-span-2`}>
+                    {passwordValidation.hasSpecialChar ? (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span>Special character (!@#$%^&*)</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type='submit'

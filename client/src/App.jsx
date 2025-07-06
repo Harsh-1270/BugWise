@@ -67,12 +67,6 @@ const App = () => {
     setAuthForm(null); // Close auth form
     localStorage.setItem('authToken', userData.token || 'logged-in');
     localStorage.setItem('userData', JSON.stringify(userData));
-    
-    if (context === "register") {
-      toast.success("Registered successfully!");
-    } else {
-      toast.success("Login successful!");
-    }
   };
 
   // Handle logout
@@ -140,7 +134,9 @@ const App = () => {
               <Route path="/profile" element={<ProfilePage />} />
             </Routes>
             <Benefits />
-            <Collaboration />
+            <Collaboration 
+            onSignInCLick={handleShowSignIn}
+            />
             <Services />
             <Pricing />
             <Roadmap />
