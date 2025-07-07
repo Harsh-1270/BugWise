@@ -14,8 +14,7 @@ mongoose.connect(process.env.MONGO_URL)
 
 //middlewares
 app.use(cors({
-  origin: 'https://bugwise-client.onrender.com', // frontend origin
-  credentials: true
+  origin: 'https://bugwise-client.onrender.com'// frontend origin
 }));
 
 app.use(express.json())
