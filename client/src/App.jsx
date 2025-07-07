@@ -22,7 +22,7 @@ import VisualInsights from './components/VisualInsights';
 import DocsPage from "./components/DocsPage";
 
 axios.defaults.baseURL = 'https://bugwise-server.onrender.com'
-axios.defaults.withCredentials = true
+
 
 const App = () => {
   const [authForm, setAuthForm] = useState(null); // null, 'signin', or 'signup'
