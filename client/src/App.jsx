@@ -21,7 +21,7 @@ import BugHistory from './components/BugHistory';
 import VisualInsights from './components/VisualInsights';
 import DocsPage from "./components/DocsPage";
 
-axios.defaults.baseURL = 'http://localhost:8000'
+axios.defaults.baseURL = 'https://bugwise-server.onrender.com'
 axios.defaults.withCredentials = true
 
 const App = () => {
