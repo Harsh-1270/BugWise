@@ -18,8 +18,6 @@ const BugHistoryPage = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const itemsPerPage = 10;
-// Pick the API base URL from the env var, fall back to localhost in dev
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
   // Footer Component
 const Footer = () => {
@@ -75,7 +73,7 @@ const Footer = () => {
         queryParams.append('status', statusFilter);
       }
 
-      const response = await fetch(`${API_BASE}/api/scan/history?${queryParams}`, {
+      const response = await fetch(`/api/scan/history?${queryParams}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -116,7 +114,7 @@ const Footer = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${API_BASE}/api/scan/${scanId}`, {
+      const response = await fetch(`/api/scan/${scanId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -159,7 +157,7 @@ const Footer = () => {
       // Add to rescanning set
       setRescanningIds(prev => new Set([...prev, scanId]));
 
-      const response = await fetch('${API_BASE}/api/scan', {
+      const response = await fetch('/api/scan', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
