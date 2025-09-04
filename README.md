@@ -1,7 +1,8 @@
 
 # 🐞 BugWise
 
-BugWise is an AI-powered full-stack web app that detects bugs and vulnerabilities in GitHub repositories using the **CodeBERT** model from HuggingFace. Designed with a clean UI, deep learning backend, and robust scan history features, BugWise empowers developers to find and fix issues quickly.
+**BugWise** is an AI-powered full-stack web app that detects bugs and vulnerabilities in GitHub repositories using the **CodeBERT** model, accessed via Hugging Face API token. Built with a clean React UI, Node.js backend, and intelligent scan history tracking, BugWise empowers developers to find and fix issues faster and more efficiently.
+
 
 ---
 
@@ -43,9 +44,15 @@ BugWise is an AI-powered full-stack web app that detects bugs and vulnerabilitie
 - Calls CodeBERT model to analyze code for bugs
 - Shows loading animation and returns detailed bug list
 
-![Detect Bugs](./screenshots/detect-bugs_1.png)
-(./screenshots/detect-bugs_2.png)
-(./screenshots/detect-bugs_3.png)
+![Detect Bugs_1](./screenshots/detect-bugs_1.png)
+
+---
+
+![Detect Bugs_2](./screenshots/detect-bugs_2.png)
+
+---
+
+![Detect Bugs_3](./screenshots/detect-bugs_3.png)
 
 ---
 
@@ -55,8 +62,11 @@ BugWise is an AI-powered full-stack web app that detects bugs and vulnerabilitie
 - View scan summaries by repo, date, severity
 - Click to view full results
 
-![Bug History](./screenshots/history_1.png)
-(./screenshots/history_2.png)
+![Bug History_1](./screenshots/history_1.png)
+
+---
+
+![Bug History_2](./screenshots/history_2.png)
 
 ---
 
@@ -66,9 +76,15 @@ BugWise is an AI-powered full-stack web app that detects bugs and vulnerabilitie
 - Severity distribution, bug trends, language stats
 - PDF export feature for reports
 
-![Visual Insights](./screenshots/visual_insights_1.png)
-(./screenshots/visual_insights_2.png)
-(./screenshots/visual_insights_3.png)
+![Visual Insights_1](./screenshots/visual_insights_1.png)
+
+---
+
+![Visual Insights_2](./screenshots/visual_insights_2.png)
+
+---
+
+![Visual Insights_3](./screenshots/visual_insights_3.png)
 
 ---
 
@@ -104,6 +120,7 @@ BugWise is an AI-powered full-stack web app that detects bugs and vulnerabilitie
 
 ### ⚛️ Frontend (`client/`)
 
+```plaintext
 client/
 ├── public/
 ├── src/
@@ -117,10 +134,11 @@ client/
 ├── .env
 ├── tailwind.config.js
 └── vite.config.js
-
+```
 
 ### 🛠️ Backend (`server/`)
 
+```plaintext
 server/
 ├── bug-detector/
 ├── config/ # DB connection, environment config
@@ -141,6 +159,7 @@ server/
 ├── .env
 └── index.js
 
+```
 
 ---
 
