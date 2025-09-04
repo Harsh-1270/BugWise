@@ -110,11 +110,11 @@ const SCANNABLE_EXTENSIONS = [
 
 class AICodeAnalyzer {
   constructor() {
-    this.apiKey = process.env.HUGGINGFACE_API_KEY; // Optional for higher rate limits
+    this.apiKey = process.env.HUGGINGFACE_API_KEY; 
     this.tempDir = path.join(__dirname, '../temp');
     this.ensureTempDir();
   }
-// Add this method to AICodeAnalyzer class
+
 normalizeSeverity(severity) {
   const severityMap = {
     'critical': 'critical',
@@ -456,7 +456,7 @@ Format: BUG: [type] | SEVERITY: [high/medium/low] | LINE: [number] | MESSAGE: [d
 
 // Main scanning functions
 
-// Your existing scanRepository function (unchanged)
+
 async function scanRepository(repoUrl) {
   const analyzer = new AICodeAnalyzer();
   let repoPath = null;

@@ -94,17 +94,15 @@ router.post('/', auth, scanRateLimit, async (req, res) => {
 
     await scan.save();
 
-    // ✅ Added log to trace crash point
+    // Added log to trace crash point
     console.log(`🚀 Scan created for ${repoUrl}, scanId: ${scan._id}`);
 
     // Start AI scan safely
     try {
-      await startScan(scan._id);  // now awaited to catch immediate crashes
-      //     
+      await startScan(scan._id);     
       console.log(`✅ Background scan started for scanId: ${scan._id}`);
     } catch (scanErr) {
       console.error(`❌ Background scan crash:`, scanErr);
-      // Update scan status to 'failed'
       scan.status = 'failed';
       scan.error = scanErr.message || 'Unknown error in scan service';
       scan.scannedAt = new Date();
@@ -136,7 +134,7 @@ router.post('/', auth, scanRateLimit, async (req, res) => {
 });
 
 
-// GET /api/scan/history - Enhanced scan history with AI insights
+// GET /api/scan/history - scan history with AI insights
 router.get('/history', auth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -429,7 +427,7 @@ router.get('/stats/dashboard', auth, async (req, res) => {
   }
 });
 
-// 🆕 NEW API: GET /api/scan/:scanId/bugs - Get detailed bugs for a specific scan
+// NEW API: GET /api/scan/:scanId/bugs - Get detailed bugs for a specific scan
 router.get('/:scanId/bugs', auth, async (req, res) => {
   try {
     const { scanId } = req.params;
@@ -462,7 +460,7 @@ router.get('/:scanId/bugs', auth, async (req, res) => {
       filePath: bug.filePath || bug.file,
       line: bug.line || bug.lineNumber,
       column: bug.column,
-      severity: mapSeverity(bug.severity), // 🔄 UPDATED: Use severity mapping
+      severity: mapSeverity(bug.severity), 
       type: bug.type || bug.category,
       message: bug.message || bug.description,
       rule: bug.rule || bug.ruleId,
@@ -496,7 +494,7 @@ router.get('/:scanId/bugs', auth, async (req, res) => {
   }
 });
 
-// 🆕 NEW API: GET /api/scan/analytics/overview - Get analytics overview for visual insights
+// NEW API: GET /api/scan/analytics/overview - Get analytics overview for visual insights
 router.get('/analytics/overview', auth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -530,7 +528,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       const bugs = scan.scanResults?.bugs || [];
       const transformedBugs = bugs.map(bug => ({
         ...bug,
-        severity: mapSeverity(bug.severity), // 🔄 UPDATED: Use severity mapping
+        severity: mapSeverity(bug.severity), // UPDATED: Use severity mapping
         scanId: scan._id,
         repoName: scan.repoName,
         scanDate: scan.scannedAt,
@@ -558,7 +556,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
     const totalRepos = new Set(scans.map(s => s.repoName)).size;
     const avgBugsPerScan = scans.length > 0 ? (totalBugs / scans.length).toFixed(1) : '0.0';
 
-    // 🔄 UPDATED: Severity distribution with correct mapping
+    // UPDATED: Severity distribution with correct mapping
     const severityCount = { critical: 0, major: 0, minor: 0, unknown: 0 };
     allBugs.forEach(bug => {
       const severity = bug.severity.toLowerCase();
@@ -569,7 +567,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       }
     });
 
-    // 🔄 UPDATED: Timeline data with correct severity mapping
+    // UPDATED: Timeline data with correct severity mapping
     const timelineData = {};
     for (let d = new Date(startDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
       const dateKey = d.toISOString().split('T')[0];
@@ -589,7 +587,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
       }
     });
 
-    // 🔄 UPDATED: Repository stats with correct severity mapping
+    // UPDATED: Repository stats with correct severity mapping
     const repoStats = {};
     allBugs.forEach(bug => {
       const repo = bug.repoName || 'Unknown';
@@ -658,7 +656,7 @@ router.get('/analytics/overview', auth, async (req, res) => {
   }
 });
 
-// 🆕 NEW API: GET /api/scan/analytics/repositories - Get repository analytics
+// NEW API: GET /api/scan/analytics/repositories - Get repository analytics
 router.get('/analytics/repositories', auth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -778,7 +776,7 @@ function extractLanguageFromFile(filePath) {
   return languageMap[extension] || null;
 }
 
-// 🔄 UPDATED: Severity color mapping
+// UPDATED: Severity color mapping
 function getSeverityColor(severity) {
   const colors = {
     critical: '#ef4444',  // Red
